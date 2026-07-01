@@ -8,6 +8,9 @@ interface Store {
   detailId: string | null; setDetailId: (id: string | null) => void
   detailType: string; setDetailType: (t: string) => void
   detailTitle: string; setDetailTitle: (t: string) => void
+  episodeId: number | null; setEpisodeId: (id: number | null) => void
+  episodeTitle: string; setEpisodeTitle: (t: string) => void
+  episodeContentId: string; setEpisodeContentId: (id: string) => void
   searchOpen: boolean; setSearchOpen: (v: boolean) => void
   searchResults: StrSrc[]; setSearchResults: (r: StrSrc[]) => void
   searchQuery: string; setSearchQuery: (q: string) => void
@@ -34,6 +37,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detailType, setDetailType] = useState('movie')
   const [detailTitle, setDetailTitle] = useState('')
+  const [episodeId, setEpisodeId] = useState<number | null>(null)
+  const [episodeTitle, setEpisodeTitle] = useState('')
+  const [episodeContentId, setEpisodeContentId] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchResults, setSearchResults] = useState<StrSrc[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -48,11 +54,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [dockOpen, setDockOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
-  const [showSignup, _setShowSignup] = useState(false)
-  const setShowSignup = () => {}
+  const [showSignup, setShowSignup] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
 
-  const allowedPages: Page[] = ['home', 'anime', 'detail', 'downloads', 'settings', 'history']
+  const allowedPages: Page[] = ['home', 'movies', 'tvshows', 'kdramas', 'anime', 'hentai', 'games', 'detail', 'episode', 'downloads', 'settings', 'marketplace', 'watchtogether', 'watchlist', 'collection', 'profile', 'history']
 
   const handleSetPage = (p: Page) => {
     if (!allowedPages.includes(p)) return
@@ -68,6 +73,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const prev = pageHistory[pageHistory.length - 1]
       setPageHistory(prev => prev.slice(0, -1))
       setPage(prev)
+    } else if (prevPage) {
+      setPage(prevPage)
+    } else {
+      setPage('home')
     }
   }
 
@@ -87,6 +96,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       page, setPage: handleSetPage, prevPage, setPrevPage, goBack,
       detailId, setDetailId, detailType, setDetailType, detailTitle, setDetailTitle,
+      episodeId, setEpisodeId, episodeTitle, setEpisodeTitle, episodeContentId, setEpisodeContentId,
       searchOpen, setSearchOpen, searchResults, setSearchResults,
       searchQuery, setSearchQuery, toast, showToast, clearToast, favs, setFavs,
       settings, setSettings: handleSetSettings, sidebarOpen, setSidebarOpen,

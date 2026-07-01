@@ -117,3 +117,14 @@ export const getPcUsername = () => invoke<string>('get_pc_username')
 export async function proxyImage(url: string): Promise<string> {
   return invoke<string>('proxy_image', { url })
 }
+
+export interface Comment { id: number; content_id: string; episode: number | null; author: string; text: string; created_at: string }
+export const addComment = (contentId: string, episode: number | null, author: string, text: string) => invoke<Comment>('add_comment', { contentId, episode, author, text })
+export const getComments = (contentId: string, episode: number | null) => invoke<Comment[]>('get_comments', { contentId, episode })
+export const deleteComment = (id: number) => invoke<void>('delete_comment', { id })
+export const addToLibrary = (contentId: string, title: string, poster: string) => invoke<void>('add_to_library', { contentId, title, poster })
+export const isInLibrary = (contentId: string) => invoke<boolean>('is_in_library', { contentId })
+
+export interface LibraryItem { content_id: string; title: string; poster: string; added_at: string }
+export const getLibrary = () => invoke<LibraryItem[]>('get_library')
+export const removeFromLibrary = (contentId: string) => invoke<void>('remove_from_library', { contentId })

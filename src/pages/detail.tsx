@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
-import { getMovies, getGames, getAnime, getSeries, getHentai, searchMovies, searchSeries, searchAnime, searchHentai, searchGames, getEpisodeStreams, toggleFav, getApiDetail, anilistSync, getAnilistToken, playMedia } from '../lib/api'
+import { getMovies, getGames, getAnime, getSeries, getHentai, searchMovies, searchSeries, searchAnime, searchHentai, searchGames, toggleFav, getApiDetail, anilistSync, getAnilistToken, addToLibrary, isInLibrary } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Player } from '../components/player'
 import type { Movie, Game, Anime, Series, Hentai, StrSrc } from '../lib/types'
 import { open } from '@tauri-apps/plugin-shell'
-import { Play, ArrowLeft, Star, Magnet, Bookmark, RotateCcw, AlertCircle, Loader2, Check } from 'lucide-react'
+import { Play, ArrowLeft, Star, Magnet, Bookmark, AlertCircle, Loader2, Plus, Check } from 'lucide-react'
 import { CachedImage } from '../components/cached-image'
+import CommentSection from '../components/comment-section'
 
 export function DetailPage() {
-  const { detailId, detailType, setPage, showToast, favs, setFavs, setDetailTitle } = useStore()
+  const { detailId, detailType, showToast, favs, setFavs, setDetailTitle, goBack, detailTitle, setEpisodeId, setEpisodeTitle, setEpisodeContentId, setPage } = useStore()
   const [movie, setMovie] = useState<Movie | null>(null)
   const [series, setSeries] = useState<Series | null>(null)
   const [game, setGame] = useState<Game | null>(null)
@@ -20,22 +21,19 @@ export function DetailPage() {
   const [searching, setSearching] = useState(false)
   const [initialSearchDone, setInitialSearchDone] = useState(false)
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null)
-  const [watchedEps, setWatchedEps] = useState<Set<string>>(new Set())
   const [playerOpen, setPlayerOpen] = useState(false)
   const [playerUrl, setPlayerUrl] = useState('')
   const [playerTitle, setPlayerTitle] = useState('')
   const [backdropFailed, setBackdropFailed] = useState(false)
   const [anilistRating, setAnilistRating] = useState(7)
   const [anilistStatus, setAnilistStatus] = useState('watching')
+  const [inLibrary, setInLibrary] = useState(false)
+  const [addingToLib, setAddingToLib] = useState(false)
 
-  const toggleWatched = (season: number, episode: number) => {
-    const key = `${season}-${episode}`
-    setWatchedEps(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) { next.delete(key) } else { next.add(key) }
-      return next
-    })
-  }
+  useEffect(() => {
+    if (!detailId) return
+    isInLibrary(detailId).then(setInLibrary).catch(() => {})
+  }, [detailId])
 
   useEffect(() => {
     if (!detailId) return
@@ -147,11 +145,15 @@ export function DetailPage() {
     doSearch(itemTitle)
   }, [item, itemTitle, detailType])
 
+  useEffect(() => {
+    if (detailTitle && !item) doSearch(detailTitle)
+  }, [detailTitle])
+
   const validStreams = streams.filter(s => s.name && s.name.trim().length >= 3)
 
-  const openPlayer = (url: string, title: string) => {
+  const openPlayer = async (url: string, title: string) => {
     if (url.startsWith('magnet:')) {
-      playMedia(url, title)
+      setPlayerUrl(url); setPlayerTitle(title); setPlayerOpen(true)
     } else if (url.startsWith('http') && (url.endsWith('.torrent') || detailType === 'game')) {
       open(url)
     } else {
@@ -217,7 +219,7 @@ export function DetailPage() {
           <div className="w-full h-full bg-gradient-to-br from-deep via-accent/5 to-deep" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-deep via-deep/60 to-transparent" />
-        <button onClick={() => setPage('home')}
+        <button onClick={() => goBack()}
           className="absolute top-4 left-4 glass glass-hover rounded-xl px-3 py-2 text-sm text-dim cursor-pointer z-10 flex items-center gap-1.5">
           <ArrowLeft size={16} /> Back
         </button>
@@ -261,11 +263,24 @@ export function DetailPage() {
             <div className="flex gap-3 mt-4">
               <Button variant="primary" size="md" disabled={!(validStreams.length > 0 && !searching)}
                 onClick={() => validStreams[0] && openPlayer(validStreams[0].url, title)}>
-                <Play size={16} /> {searching ? 'Searching...' : validStreams.length > 0 ? actionLabel : 'Unavailable'}
+                <Play size={16} /> {validStreams.length > 0 ? actionLabel : 'Unavailable'}
               </Button>
               <Button variant="outline" size="md" onClick={() => doSearch(title)} disabled={searching}>
                 {searching ? <Loader2 size={14} className="animate-spin" /> : <Magnet size={16} />} {searching ? 'Searching...' : 'Search Streams'}
               </Button>
+              {detailId && (hasSeasons || hasAnimeEps) && !inLibrary && (
+                <Button variant="primary" size="md" disabled={addingToLib}
+                  onClick={async () => {
+                    setAddingToLib(true)
+                    await addToLibrary(detailId, title, poster)
+                    setInLibrary(true)
+                    setAddingToLib(false)
+                    showToast({ msg: 'Added to library', type: 'success' })
+                  }}>
+                  {addingToLib ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />} Add
+                </Button>
+              )}
+              {inLibrary && <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-[4px] uppercase bg-[rgba(124,92,255,0.15)] text-accent"><Check size={12} /> In Library</span>}
               <Button variant={favs.includes(detailId || '') ? 'primary' : 'ghost'} size="md"
                 onClick={async () => {
                   if (!detailId) return
@@ -304,9 +319,6 @@ export function DetailPage() {
                   <AlertCircle size={20} className="text-muted/30 mx-auto mb-2" />
                   <p className="text-sm text-dim">No streams available</p>
                   <p className="text-[12px] text-muted/50 mt-1">Content providers found nothing. Check back later.</p>
-                  <Button variant="outline" size="md" onClick={() => doSearch(title)} className="mt-3 border-white/10 hover:bg-white/10">
-                    <RotateCcw size={14} /> Try Again
-                  </Button>
                 </div>
               )}
               {validStreams.length > 0 && (
@@ -330,119 +342,85 @@ export function DetailPage() {
 
             {hasSeasons && (
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-text">Episodes</h3>
-                  <select value={selectedSeason ?? series.seasons[0].num}
-                    onChange={(e) => setSelectedSeason(Number(e.target.value))}
-                    className="bg-surface text-text border border-border/30 rounded-lg px-3 py-1.5 text-sm cursor-pointer">
-                    {series.seasons.map(s => (
-                      <option key={s.num} value={s.num}>Season {s.num}</option>
-                    ))}
-                  </select>
-                </div>
-                {(() => {
-                  const season = series.seasons.find(s => s.num === selectedSeason)
-                  if (!season) return null
-                  const epCount = season.episodes.length
-                  const watchedCount = season.episodes.filter(ep => watchedEps.has(`${season.num}-${ep.num}`)).length
-                  const totalAllEps = series.seasons.reduce((a, s) => a + s.episodes.length, 0)
-                  const totalAllWatched = series.seasons.reduce((a, s) => a + s.episodes.filter(ep => watchedEps.has(`${s.num}-${ep.num}`)).length, 0)
-                  const totalPct = totalAllEps > 0 ? Math.round((totalAllWatched / totalAllEps) * 100) : 0
-                  return (
-                    <>
-                      {totalAllEps > 0 && (
-                        <div className="mb-3 text-xs text-muted flex items-center gap-2">
-                          <span>Progress: {totalAllWatched}/{totalAllEps} episodes · {totalPct}%</span>
-                        </div>
-                      )}
-                      <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden mb-4">
-                        <div className="h-full bg-gradient-to-r from-accent to-success rounded-full transition-all duration-500" style={{ width: `${totalPct}%` }} />
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-dim">Season {season.num}</span>
-                        <span className="text-xs text-muted">{watchedCount}/{epCount} ({epCount > 0 ? Math.round((watchedCount / epCount) * 100) : 0}%)</span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                        {season.episodes.map(ep => {
-                          const isWatched = watchedEps.has(`${season.num}-${ep.num}`)
-                          return (
-                            <div key={ep.num} onClick={() => getEpisodeStreams(series.id, season.num, ep.num).then(s => s.length > 0 && openPlayer(s[0].url, `${series.title} - S${season.num}E${ep.num}`)).catch(() => {})}
-                              className={`relative rounded-lg p-3 transition-all select-none cursor-pointer ${
-                                isWatched
-                                  ? 'bg-surface border border-success/30 opacity-60'
-                                  : 'bg-surface/60 border border-border/30 hover:bg-white/10 hover:border-border-hover'
-                              }`}>
-                              <button onClick={(e) => { e.stopPropagation(); toggleWatched(season.num, ep.num) }}
-                                className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/10">
-                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isWatched ? 'bg-success border-success' : 'border-muted'}`}>
-                                  {isWatched && <Check size={10} className="text-white" />}
-                                </div>
-                              </button>
-                              <div className="text-base font-bold text-text mb-1">E{ep.num}</div>
-                              <div className="text-xs text-dim leading-tight line-clamp-2">{ep.title || `Episode ${ep.num}`}</div>
-                              <div className="text-[10px] text-accent mt-1 flex items-center gap-1">
-                                <Play size={10} /> Play
+                {inLibrary ? (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-semibold text-text">Episodes</h3>
+                      <select value={selectedSeason ?? series.seasons[0].num}
+                        onChange={(e) => setSelectedSeason(Number(e.target.value))}
+                        className="bg-surface text-text border border-border/30 rounded-lg px-3 py-1.5 text-sm cursor-pointer">
+                        {series.seasons.map(s => (
+                          <option key={s.num} value={s.num}>Season {s.num}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {(() => {
+                      const season = series.seasons.find(s => s.num === selectedSeason)
+                      if (!season) return null
+                      return (
+                        <div className="max-h-[520px] overflow-y-auto space-y-1 pr-1">
+                          {season.episodes.map(ep => (
+                            <div key={ep.num} onClick={() => {
+                              setEpisodeId(ep.num); setEpisodeTitle(ep.title || `Episode ${ep.num}`); setEpisodeContentId(series.id); setPage('episode')
+                            }}
+                              className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all select-none cursor-pointer bg-surface/40 border border-border/20 hover:bg-white/8 hover:border-border-hover group/ep">
+                              <div className="w-8 h-8 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-accent">{ep.num}</span>
                               </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-text truncate">{ep.title || `Episode ${ep.num}`}</p>
+                              </div>
+                              <Play size={14} className="text-muted/40 group-hover/ep:text-accent transition-colors shrink-0" />
                             </div>
-                          )
-                        })}
-                      </div>
-                    </>
-                  )
-                })()}
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </>
+                ) : (
+                  <div className="glass rounded-xl p-5 text-center border border-border/50">
+                    <p className="text-sm text-dim">Add to library to access episodes</p>
+                  </div>
+                )}
               </div>
             )}
 
             {hasAnimeEps && (
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-text">Episodes</h3>
-                  <span className="text-xs text-muted">{anime.eps} total</span>
-                </div>
-                {(() => {
-                  const totalEps = anime.eps
-                  const watchedCount = Array.from({ length: totalEps }, (_, i) => i + 1).filter(epNum => watchedEps.has(`1-${epNum}`)).length
-                  return (
-                    <>
-                      <div className="mb-3 text-xs text-muted flex items-center gap-2">
-                        <span>Progress: {watchedCount}/{totalEps} · {totalEps > 0 ? Math.round((watchedCount / totalEps) * 100) : 0}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden mb-4">
-                        <div className="h-full bg-gradient-to-r from-accent to-success rounded-full transition-all duration-500" style={{ width: `${totalEps > 0 ? Math.round((watchedCount / totalEps) * 100) : 0}%` }} />
-                      </div>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 gap-2">
-                        {Array.from({ length: Math.min(totalEps, 50) }, (_, i) => {
-                          const epNum = i + 1
-                          const isWatched = watchedEps.has(`1-${epNum}`)
-                          return (
-                            <div key={epNum} onClick={async () => {
-                              try { const r = await searchAnime(anime.title); if (r.length > 0) openPlayer(r[0].url, `${anime.title} - Ep ${epNum}`) } catch {}
-                            }}
-                              className={`rounded-lg p-3 transition-all select-none cursor-pointer ${
-                                isWatched
-                                  ? 'bg-surface border border-success/30 opacity-60'
-                                  : 'bg-surface/60 border border-border/30 hover:bg-white/10 hover:border-border-hover'
-                              }`}>
-                              <button onClick={(e) => { e.stopPropagation(); toggleWatched(1, epNum) }}
-                                className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/10">
-                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isWatched ? 'bg-success border-success' : 'border-muted'}`}>
-                                  {isWatched && <Check size={10} className="text-white" />}
-                                </div>
-                              </button>
-                              <div className="text-base font-bold text-text">E{epNum}</div>
-                              <div className="text-[10px] text-accent mt-1 flex items-center gap-1">
-                                <Play size={10} /> Play
-                              </div>
+                {inLibrary ? (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-semibold text-text">Episodes</h3>
+                      <span className="text-xs text-muted">{anime.eps} total</span>
+                    </div>
+                    <div className="max-h-[520px] overflow-y-auto space-y-1 pr-1">
+                      {Array.from({ length: Math.min(anime.eps, 50) }, (_, i) => {
+                        const epNum = i + 1
+                        return (
+                          <div key={epNum} onClick={() => {
+                            setEpisodeId(epNum); setEpisodeTitle(anime.title); setEpisodeContentId(anime.id); setPage('episode')
+                          }}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all select-none cursor-pointer bg-surface/40 border border-border/20 hover:bg-white/8 hover:border-border-hover group/ep">
+                            <div className="w-8 h-8 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-bold text-accent">{epNum}</span>
                             </div>
-                          )
-                        })}
-                        {totalEps > 50 && (
-                          <div className="col-span-full text-center text-xs text-muted/50 pt-2">+ {totalEps - 50} more episodes</div>
-                        )}
-                      </div>
-                    </>
-                  )
-                })()}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-text">Episode {epNum}</p>
+                            </div>
+                            <Play size={14} className="text-muted/40 group-hover/ep:text-accent transition-colors shrink-0" />
+                          </div>
+                        )
+                      })}
+                      {anime.eps > 50 && (
+                        <p className="text-center text-xs text-muted/50 pt-2">+ {anime.eps - 50} more episodes</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="glass rounded-xl p-5 text-center border border-border/50">
+                    <p className="text-sm text-dim">Add to library to access episodes</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -489,6 +467,10 @@ export function DetailPage() {
             </div>
           </div>
         )}
+
+        <div className="mt-8 max-w-2xl">
+          {detailId && <CommentSection contentId={detailId} />}
+        </div>
       </div>
 
       {playerOpen && <Player url={playerUrl} title={playerTitle} poster={poster} onClose={() => setPlayerOpen(false)} />}

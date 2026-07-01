@@ -5,6 +5,7 @@ import { AnimeCard, AnimeCardSkeleton } from '../components/cards/anime-card'
 import { CachedImage } from '../components/cached-image'
 import { useStore } from '../lib/store'
 import { browseCatalog, getPlayback } from '../lib/api'
+import { preloadBatch } from '../lib/img-cache'
 import type { CatalogItem, PlaybackPos } from '../lib/types'
 import { Play, Clock, Shuffle, Sparkles, Swords, Smile, Star } from 'lucide-react'
 
@@ -30,6 +31,12 @@ export function HomePage() {
       setPlayback(p)
     }).finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (anime.length === 0) return
+    const urls = anime.slice(0, 15).map(a => a.poster).filter(Boolean) as string[]
+    preloadBatch(urls)
+  }, [anime])
 
   const heroItems = anime
     .filter(a => a.poster && a.poster.length > 0)

@@ -25,7 +25,7 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 tokio = { version = "1.38", features = ["full"] }
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "cookies"] }
 sqlx = { version = "0.7", features = ["runtime-tokio", "tls-rustls", "sqlite"] }
 scraper = "0.19"
 which = "6.0"

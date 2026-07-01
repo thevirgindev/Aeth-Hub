@@ -11,6 +11,7 @@ import type { UserTheme } from './lib/types'
 import { checkForUpdate } from './lib/update-check'
 import { DownloadBar } from './components/download-bar'
 import { Welcome } from './components/welcome'
+import { SignupModal } from './components/signup-modal'
 import { ChevronsRight, Container, X } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-shell'
 
@@ -21,6 +22,7 @@ const KdramasPage = lazy(() => import('./pages/kdramas').then(m => ({ default: m
 const AnimePage = lazy(() => import('./pages/anime').then(m => ({ default: m.AnimePage })))
 const GamesPage = lazy(() => import('./pages/games').then(m => ({ default: m.GamesPage })))
 const DetailPage = lazy(() => import('./pages/detail').then(m => ({ default: m.DetailPage })))
+const EpisodePage = lazy(() => import('./pages/episode').then(m => ({ default: m.EpisodePage })))
 const DownloadsPage = lazy(() => import('./pages/downloads').then(m => ({ default: m.DownloadsPage })))
 const SettingsPage = lazy(() => import('./pages/settings').then(m => ({ default: m.SettingsPage })))
 const MarketplacePage = lazy(() => import('./pages/marketplace').then(m => ({ default: m.MarketplacePage })))
@@ -38,6 +40,7 @@ const pageEntries: [string, React.LazyExoticComponent<React.ComponentType>][] = 
   ['anime', AnimePage],
   ['games', GamesPage],
   ['detail', DetailPage],
+  ['episode', EpisodePage],
   ['downloads', DownloadsPage],
   ['settings', SettingsPage],
   ['marketplace', MarketplacePage],
@@ -380,6 +383,7 @@ export default function App() {
           </div>
         </div>
       )}
+      <SignupModal />
     </div>
   )
 }

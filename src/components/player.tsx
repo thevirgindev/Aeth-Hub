@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Play, Pause, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react'
+import { X, Play, Pause, Maximize, Minimize, Volume2, VolumeX, Loader2 } from 'lucide-react'
 
 interface PlayerProps {
   url: string
@@ -19,8 +19,11 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [playbackRate, setPlaybackRate] = useState(1.0)
+  const [torrentStatus, setTorrentStatus] = useState<string | null>(null)
+  const [torrentError, setTorrentError] = useState<string | null>(null)
   const hideTimerRef = useRef<number | null>(null)
   const rateRef = useRef(1.0)
+  const isMagnet = url.startsWith('magnet:')
 
   rateRef.current = playbackRate
 
@@ -31,6 +34,40 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
   }
 
   useEffect(() => {
+    if (!isMagnet) return
+    let client: any
+    let cancelled = false
+    setTorrentStatus('Connecting to peers...')
+    const init = async () => {
+      try {
+        const WebTorrent = (await import('webtorrent')).default
+        client = new WebTorrent()
+        client.add(url, (torrent: any) => {
+          if (cancelled) { client.destroy(); return }
+          setTorrentStatus(`Downloading: ${(torrent.progress * 100).toFixed(0)}%`)
+          const file = torrent.files.find((f: any) =>
+            f.name.endsWith('.mp4') || f.name.endsWith('.mkv') || f.name.endsWith('.avi') || f.name.endsWith('.webm')
+          )
+          if (file && videoRef.current) {
+            setTorrentStatus(null)
+            file.renderTo(videoRef.current, { autoplay: true })
+          } else {
+            setTorrentStatus('No playable video file found')
+          }
+        })
+        client.on('error', (err: Error) => {
+          setTorrentError(err.message)
+        })
+      } catch (e: any) {
+        setTorrentError(e?.message || 'Failed to load torrent engine')
+      }
+    }
+    init()
+    return () => { cancelled = true; client?.destroy() }
+  }, [url, isMagnet])
+
+  useEffect(() => {
+    if (isMagnet) return
     const v = videoRef.current
     if (!v) return
     const onTime = () => { setCurrentTime(v.currentTime) }
@@ -48,12 +85,10 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
       if (e.key === 'ArrowUp') { e.preventDefault(); setVolume(prev => { const n = Math.min(prev + 0.1, 1); if (videoRef.current) videoRef.current.volume = n; return n }) }
       if (e.key === 'ArrowDown') { e.preventDefault(); setVolume(prev => { const n = Math.max(prev - 0.1, 0); if (videoRef.current) videoRef.current.volume = n; return n }) }
       if (e.key === 'm') toggleMute()
-
       if (e.key >= '0' && e.key <= '9') {
         const pct = parseInt(e.key, 10) / 10
         v.currentTime = v.duration * pct
       }
-
       if (e.key === '<') {
         const rates = [0.5, 1.0, 1.25, 1.5, 2.0]
         const idx = rates.indexOf(rateRef.current)
@@ -128,8 +163,25 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
           style={{ backgroundImage: `url(${poster})` }} />
       )}
       <div className="relative w-full h-full flex items-center justify-center">
-        <video ref={videoRef} src={url} className="max-w-full max-h-full w-auto h-auto"
-          onClick={togglePlay} />
+        {torrentStatus && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-3">
+            <Loader2 size={32} className="text-accent animate-spin" />
+            <p className="text-white/60 text-sm">{torrentStatus}</p>
+          </div>
+        )}
+        {torrentError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-3">
+            <p className="text-error text-sm">Stream failed: {torrentError}</p>
+            <button onClick={onClose}
+              className="glass glass-hover rounded-xl px-4 py-2 text-sm text-text cursor-pointer">
+              Close
+            </button>
+          </div>
+        )}
+        <video ref={videoRef} src={isMagnet ? undefined : url}
+          className={`max-w-full max-h-full w-auto h-auto ${torrentStatus ? 'opacity-0' : 'opacity-100'}`}
+          onClick={togglePlay}
+          crossOrigin="anonymous" />
         <div ref={controlsRef}
           className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-12 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <div className="max-w-4xl mx-auto">
@@ -150,7 +202,6 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
                   <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={handleVolume}
                     className="w-16 h-1 accent-accent cursor-pointer player-range" />
                 </div>
-
                 <div className="relative group/speed flex items-center">
                   <button className="text-white/80 hover:text-accent text-[11px] font-bold px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors cursor-pointer min-w-[44px]">
                     {playbackRate}x
@@ -166,7 +217,6 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
                     ))}
                   </div>
                 </div>
-
                 <button onClick={toggleFullscreen} className="text-white/80 hover:text-accent cursor-pointer transition-colors">
                   {fullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                 </button>

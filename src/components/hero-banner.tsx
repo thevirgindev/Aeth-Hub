@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Button } from './ui/button'
-import { Play, Info } from 'lucide-react'
+import { Play } from 'lucide-react'
 
 interface HeroItem {
   id: string; title: string; backdrop: string; overview: string
@@ -14,7 +14,7 @@ interface Props {
   renderMeta?: (item: HeroItem) => ReactNode
 }
 
-export function HeroBanner({ items, onPlay, onDetail, renderMeta }: Props) {
+export function HeroBanner({ items, onPlay, onDetail: _onDetail, renderMeta }: Props) {
   const [idx, setIdx] = useState(0)
   const item = items[idx]
 
@@ -61,10 +61,7 @@ export function HeroBanner({ items, onPlay, onDetail, renderMeta }: Props) {
           {renderMeta?.(item)}
           <div className="flex gap-3 mt-4">
             <Button variant="primary" size="lg" onClick={() => onPlay(item.id)}>
-              <Play size={16} /> Play Now
-            </Button>
-            <Button variant="outline" size="lg" onClick={() => onDetail(item.id)}>
-              <Info size={16} /> Details
+              <Play size={16} /> Watch Now
             </Button>
           </div>
         </div>

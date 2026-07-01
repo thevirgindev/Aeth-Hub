@@ -1,5 +1,6 @@
 use crate::anilist;
 use crate::cache::ApiCache;
+use crate::comments;
 use crate::db;
 use crate::discord::DiscordRpc;
 use crate::dl::DlMgr;
@@ -606,6 +607,41 @@ pub async fn proxy_image(url: String) -> Result<String, String> {
     imgproxy::proxy_image(url).await.map_err(|e| sanitize_error(&e))
 }
 
+#[tauri::command]
+pub async fn add_comment(content_id: String, episode: Option<i32>, author: String, text: String, state: State<'_, AppState>) -> Result<comments::Comment, String> {
+    comments::add_comment(&state.db, &content_id, episode, &author, &text).await
+}
+
+#[tauri::command]
+pub async fn get_comments(content_id: String, episode: Option<i32>, state: State<'_, AppState>) -> Result<Vec<comments::Comment>, String> {
+    comments::get_comments(&state.db, &content_id, episode).await
+}
+
+#[tauri::command]
+pub async fn delete_comment(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    comments::delete_comment(&state.db, id).await
+}
+
+#[tauri::command]
+pub async fn add_to_library(content_id: String, title: String, poster: String, state: State<'_, AppState>) -> Result<(), String> {
+    comments::add_to_library(&state.db, &content_id, &title, &poster).await
+}
+
+#[tauri::command]
+pub async fn is_in_library(content_id: String, state: State<'_, AppState>) -> Result<bool, String> {
+    comments::is_in_library(&state.db, &content_id).await
+}
+
+#[tauri::command]
+pub async fn get_library(state: State<'_, AppState>) -> Result<Vec<comments::LibraryItem>, String> {
+    comments::get_library(&state.db).await
+}
+
+#[tauri::command]
+pub async fn remove_from_library(content_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    comments::remove_from_library(&state.db, &content_id).await
+}
+
 pub fn create_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         get_movies, get_series, get_kdramas, get_games, get_anime, get_hentai,
@@ -625,5 +661,7 @@ pub fn create_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Sen
         anilist_exchange, anilist_sync,
         search_omdb, search_movie_detail,
         proxy_image, get_pc_username,
+        add_comment, get_comments, delete_comment,
+        add_to_library, is_in_library, get_library, remove_from_library,
     ]
 }

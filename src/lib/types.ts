@@ -1,4 +1,4 @@
-export type Page = 'home' | 'movies' | 'tvshows' | 'kdramas' | 'anime' | 'hentai' | 'games' | 'detail' | 'downloads' | 'settings' | 'marketplace' | 'watchtogether' | 'watchlist' | 'socialfeed' | 'recommendations' | 'events' | 'collection' | 'profile' | 'history'
+export type Page = 'home' | 'movies' | 'tvshows' | 'kdramas' | 'anime' | 'hentai' | 'games' | 'detail' | 'episode' | 'downloads' | 'settings' | 'marketplace' | 'watchtogether' | 'watchlist' | 'socialfeed' | 'recommendations' | 'events' | 'collection' | 'profile' | 'history'
 
 export type DlStat = 'queued' | 'resolving' | 'downloading' | 'paused' | 'done' | 'failed'
 export type VMode = 'sub' | 'dub' | 'both'

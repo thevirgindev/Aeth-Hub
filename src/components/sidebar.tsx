@@ -10,13 +10,14 @@ import {
   Heart, Radio, Coffee, Rocket, Lock,
 } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-shell'
+import { checkForUpdate } from '../lib/update-check'
 
 const REPO_URL = 'https://github.com/thevirgindev/aeth-hub'
 const PATREON_URL = 'https://patreon.com/thevirgindev'
 const KOFI_URL = 'https://ko-fi.com/thevirgindev'
 const PROPELLER_URL = 'https://propellerads.com'
 
-const allowedPages = ['home', 'anime', 'detail', 'downloads', 'settings'] as const
+const allowedPages = ['home', 'anime', 'detail', 'downloads', 'settings', 'history'] as const
 
 type SectionItem = { page: Page; icon: typeof Home; label: string; tag?: string }
 
@@ -87,7 +88,7 @@ const typeIcons: Record<string, typeof Home> = {
 }
 
 export function Sidebar() {
-  const { page, setPage, setDetailId, setDetailType, sidebarOpen, setSidebarOpen, updateInfo, showToast } = useStore()
+  const { page, setPage, setDetailId, setDetailType, sidebarOpen, setSidebarOpen, updateInfo, setUpdateInfo, showToast } = useStore()
   const [recent, setRecent] = useState<PlaybackPos[]>([])
 
   useEffect(() => {
@@ -99,8 +100,22 @@ export function Sidebar() {
   const isBlocked = (p: Page) => !(allowedPages as readonly string[]).includes(p)
 
   return (
-    <nav className={`glass-sidebar flex flex-col h-full overflow-hidden rounded-tr-2xl rounded-br-2xl transition-all duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${sidebarOpen ? 'w-[240px]' : 'w-0'}`} style={{ willChange: 'width', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+    <div className="sidebar-wrapper">
+    <nav className={`glass-sidebar flex flex-col h-full transition-all duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${sidebarOpen ? 'w-[240px]' : 'w-0'}`} style={{ willChange: 'width', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
       <div className="flex flex-col w-full min-w-[240px] flex-1 overflow-y-auto overflow-x-hidden custom-scroll" style={{ scrollbarWidth: 'none' }}>
+
+        {sidebarOpen && (
+          <div className="px-4 mb-3">
+            <button onClick={() => showToast({ msg: 'Sign in not available in this preview', type: 'info' })}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-[12px] font-medium text-muted/50 hover:text-text hover:bg-white/[0.04] transition-all cursor-pointer border border-border/10">
+              <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Lock size={13} className="text-accent/60" />
+              </div>
+              <span>Sign In</span>
+              <span className="ml-auto text-[9px] uppercase tracking-[0.12em] text-muted/30 bg-white/[0.03] px-2 py-0.5 rounded">Locked</span>
+            </button>
+          </div>
+        )}
 
         {sections.map(section => {
           const SecIcon = section.icon
@@ -194,7 +209,7 @@ export function Sidebar() {
         })}
 
         {sidebarOpen && (
-          <div className="mt-auto pt-4 border-t border-border/20">
+          <div className="mt-auto pt-4">
             <div className="flex items-center justify-between px-4 mb-3">
               <div className="flex items-center gap-2">
                 <button onClick={() => open(REPO_URL)}
@@ -202,7 +217,12 @@ export function Sidebar() {
                   title="View repository">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
                 </button>
-                <button onClick={() => setPage('settings')}
+                <button onClick={async () => {
+                  showToast({ msg: 'Checking for updates...', type: 'info' })
+                  const result = await checkForUpdate()
+                  setUpdateInfo(result)
+                  if (!result.available) showToast({ msg: 'You\'re up to date!', type: 'success' })
+                }}
                   className="w-7 h-7 rounded-lg text-muted/30 hover:text-text hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center"
                   title="Check for updates">
                   <div className="relative">
@@ -271,5 +291,6 @@ export function Sidebar() {
 
       </div>
     </nav>
+    </div>
   )
 }

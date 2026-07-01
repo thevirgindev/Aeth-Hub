@@ -1,6 +1,7 @@
 mod anilist;
 mod cache;
 mod cmds;
+mod comments;
 mod db;
 mod discord;
 mod dl;
@@ -36,8 +37,10 @@ pub fn run() {
             let db_path = db_dir.join("aeth.db");
             let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
             let pool = rt.block_on(db::init_db(&db_url));
+            rt.block_on(comments::init_tables(&pool));
             let http = Client::builder()
-                .timeout(std::time::Duration::from_secs(10))
+                .cookie_store(true)
+                .timeout(std::time::Duration::from_secs(30))
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build().unwrap();
 
@@ -62,6 +65,10 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_background_color(Some(tauri::window::Color(8, 8, 10, 255)));
+            }
 
             app.manage(AppState {
                 dl: DlMgr::new(),
