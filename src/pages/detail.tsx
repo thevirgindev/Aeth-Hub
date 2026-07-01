@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
-import { getMovies, getGames, getAnime, getSeries, getHentai, searchMovies, searchSeries, searchAnime, searchHentai, searchGames, toggleFav, getApiDetail, anilistSync, getAnilistToken, addToLibrary, isInLibrary } from '../lib/api'
+import { getMovies, getGames, getAnime, getSeries, getHentai, searchMovies, searchSeries, searchAnime, searchHentai, searchGames, searchAll, toggleFav, getApiDetail, anilistSync, getAnilistToken, addToLibrary, isInLibrary } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Player } from '../components/player'
@@ -123,7 +123,7 @@ export function DetailPage() {
 
   const doSearch = async (q: string) => {
     setSearching(true)
-    const MIN_DURATION = 600
+    const MIN_DURATION = 1000
     const start = Date.now()
     try {
       const map: Record<string, (q: string) => Promise<StrSrc[]>> = {
@@ -131,7 +131,13 @@ export function DetailPage() {
       }
       const fn = map[detailType]
       if (fn) {
-        const r = await fn(q)
+        let r = await fn(q)
+        if (r.filter(s => s.name && s.name.trim().length >= 3).length === 0) {
+          r = await searchAll(q)
+        }
+        setStreams(r.filter(s => s.name && s.name.trim().length >= 3))
+      } else {
+        const r = await searchAll(q)
         setStreams(r.filter(s => s.name && s.name.trim().length >= 3))
       }
     } catch {}
