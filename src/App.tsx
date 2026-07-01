@@ -181,11 +181,11 @@ export default function App() {
           setSidebarOpen(!sidebarOpen)
         }
 
-        if (e.altKey && e.key >= '1' && e.key <= '9') {
+        if (e.altKey && e.key >= '1' && e.key <= '8') {
           e.preventDefault()
           const pageShortcuts = [
             'home', 'movies', 'tvshows', 'kdramas', 'anime',
-            'games', 'downloads', 'watchlist', 'settings'
+            'games', 'downloads', 'settings'
           ] as const
           const targetPage = pageShortcuts[parseInt(e.key, 10) - 1]
           if (targetPage) {

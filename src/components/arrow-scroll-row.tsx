@@ -4,9 +4,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 interface ArrowScrollRowProps {
   children: ReactNode
   className?: string
+  carousel?: boolean
 }
 
-export function ArrowScrollRow({ children, className = '' }: ArrowScrollRowProps) {
+export function ArrowScrollRow({ children, className = '', carousel }: ArrowScrollRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   const [canScrollL, setCanScrollL] = useState(false)
   const [canScrollR, setCanScrollR] = useState(true)
@@ -41,8 +42,13 @@ export function ArrowScrollRow({ children, className = '' }: ArrowScrollRowProps
   const scroll = (dir: 'l' | 'r') => {
     const el = rowRef.current
     if (!el) return
-    const cardW = 200 + 16
-    el.scrollBy({ left: dir === 'l' ? -cardW : cardW, behavior: 'smooth' })
+    if (carousel) {
+      const pageW = el.clientWidth
+      el.scrollBy({ left: dir === 'l' ? -pageW : pageW, behavior: 'smooth' })
+    } else {
+      const cardW = 200 + 16
+      el.scrollBy({ left: dir === 'l' ? -cardW : cardW, behavior: 'smooth' })
+    }
   }
 
   return (
@@ -52,8 +58,8 @@ export function ArrowScrollRow({ children, className = '' }: ArrowScrollRowProps
           className={`shrink-0 w-10 h-10 flex items-center justify-center bg-white/5 backdrop-blur-[4px] border border-white/10 rounded-xl text-muted hover:text-text hover:bg-white/15 hover:border-white/20 transition-all cursor-pointer mr-2 shadow-lg ${canScrollL ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <ChevronLeft size={18} />
         </button>
-        <div ref={rowRef} className="flex gap-4 overflow-x-auto scrollbar-none py-1 flex-1"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', scrollSnapType: 'x mandatory' }}>
+        <div ref={rowRef} className={`overflow-x-auto scrollbar-none py-1 flex-1 flex gap-4 ${carousel ? '[&>*]:flex-1 [&>*]:min-w-[160px] [&>*]:max-w-[200px] snap-x snap-mandatory' : ''}`}
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', ...(carousel ? {} : { scrollSnapType: 'x mandatory' }) }}>
           {children}
         </div>
         <button onClick={() => scroll('r')}

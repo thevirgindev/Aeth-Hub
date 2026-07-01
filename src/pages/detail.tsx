@@ -11,7 +11,7 @@ import { CachedImage } from '../components/cached-image'
 import CommentSection from '../components/comment-section'
 
 export function DetailPage() {
-  const { detailId, detailType, showToast, favs, setFavs, setDetailTitle, goBack, detailTitle, setEpisodeId, setEpisodeTitle, setEpisodeContentId, setPage } = useStore()
+  const { detailId, detailType, showToast, favs, setFavs, setDetailTitle, goBack, detailTitle, setEpisodeId, setEpisodeTitle, setEpisodeContentId, setPage, detailPoster } = useStore()
   const [movie, setMovie] = useState<Movie | null>(null)
   const [series, setSeries] = useState<Series | null>(null)
   const [game, setGame] = useState<Game | null>(null)
@@ -200,7 +200,7 @@ export function DetailPage() {
   )
 
   const backdrop = movie?.backdrop || series?.backdrop || anime?.banner || hentai?.banner || game?.banner || ''
-  const poster = movie?.poster || series?.poster || anime?.poster || hentai?.poster || game?.icon || ''
+  const poster = movie?.poster || series?.poster || anime?.poster || hentai?.poster || game?.icon || detailPoster || ''
   const title = itemTitle
   const overview = movie?.overview || series?.overview || anime?.synopsis || hentai?.synopsis || game?.desc || ''
   const genres = (movie?.genres || series?.genres || anime?.genres || hentai?.genres || [game?.genre || ''].filter(Boolean)) as string[]
@@ -310,9 +310,10 @@ export function DetailPage() {
         )}
 
         {showStreamSearch && (
+          <div className="bg-gradient-to-br from-base via-surface to-surface rounded-2xl border border-border/60 p-5 shadow-lg shadow-black/10 mb-8">
           <div className={`flex gap-6 ${showTwoCol ? 'flex-col lg:flex-row' : ''}`}>
             <div className={`${showTwoCol ? 'w-full lg:w-[400px] shrink-0' : 'max-w-2xl'}`}>
-              <h3 className="text-base font-semibold text-text mb-3 flex items-center gap-2"><Magnet size={15} /> Available Streams</h3>
+              <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2"><Magnet size={14} /> Available Streams</h3>
               {searching && !initialSearchDone && (
                 <div className="glass rounded-xl p-5 text-center border border-border/50">
                   <Loader2 size={20} className="text-accent animate-spin mx-auto mb-2" />
@@ -430,15 +431,16 @@ export function DetailPage() {
               </div>
             )}
           </div>
+          </div>
         )}
 
         {['anime', 'manga'].includes(detailType) && (
-          <div className="mt-8 max-w-xl">
-            <h3 className="text-base font-semibold text-text mb-3 flex items-center gap-2">
-              <Star size={15} /> AniList Sync
+          <div className="mb-8 max-w-2xl">
+            <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+              <Star size={14} /> AniList Sync
             </h3>
-            <div className="glass rounded-xl p-4 border border-border/50">
-              <p className="text-xs text-muted/60 mb-3">Track your progress on AniList.</p>
+            <div className="bg-gradient-to-br from-base via-surface to-surface rounded-2xl border border-border/60 p-5 shadow-lg shadow-black/10">
+              <p className="text-xs text-muted/60 mb-4">Track your progress on AniList.</p>
               <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                 <div className="flex-1 w-full">
                   <label className="text-[10px] text-muted/50 uppercase tracking-wider mb-1.5 block">Rating</label>
@@ -474,7 +476,7 @@ export function DetailPage() {
           </div>
         )}
 
-        <div className="mt-8 max-w-2xl">
+        <div className="mb-8 max-w-2xl">
           {detailId && <CommentSection contentId={detailId} />}
         </div>
       </div>

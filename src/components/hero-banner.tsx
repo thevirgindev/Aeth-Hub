@@ -14,7 +14,7 @@ interface Props {
   renderMeta?: (item: HeroItem) => ReactNode
 }
 
-export function HeroBanner({ items, onPlay, onDetail: _onDetail, renderMeta }: Props) {
+export function HeroBanner({ items, onPlay: _onPlay, onDetail, renderMeta }: Props) {
   const [idx, setIdx] = useState(0)
   const item = items[idx]
 
@@ -60,8 +60,8 @@ export function HeroBanner({ items, onPlay, onDetail: _onDetail, renderMeta }: P
           <p className="mt-2 text-sm text-dim/80 line-clamp-2 max-w-[550px]">{item.overview}</p>
           {renderMeta?.(item)}
           <div className="flex gap-3 mt-4">
-            <Button variant="primary" size="lg" onClick={() => onPlay(item.id)}>
-              <Play size={16} /> Watch Now
+            <Button variant="primary" size="lg" onClick={() => onDetail(item.id)}>
+              <Play size={16} /> Watch It Now
             </Button>
           </div>
         </div>

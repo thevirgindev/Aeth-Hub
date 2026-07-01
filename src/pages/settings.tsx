@@ -3,7 +3,7 @@ import { detectPlayer, getSettings, saveSettings, clearCache } from '../lib/api'
 import { useStore } from '../lib/store'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import type { AppSettings, UpdateInfo } from '../lib/types'
+import type { AppSettings, Page, UpdateInfo } from '../lib/types'
 import { checkForUpdate } from '../lib/update-check'
 import {
   Monitor, Palette, EyeOff, MessageCircle, Folder, Trash2,
@@ -53,7 +53,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 export function SettingsPage() {
-  const { setSettings: setStoreSettings, showToast, setUpdateInfo: setStoreUpdateInfo } = useStore()
+  const { setSettings: setStoreSettings, showToast, setUpdateInfo: setStoreUpdateInfo, setSettingsDirty, settingsPopup, setSettingsPopup, settingsPopupAction, setSettingsPopupAction, setPage } = useStore()
   const [activeSection, setActiveSection] = useState('player')
   const [player, setPlayer] = useState('checking...')
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -79,7 +79,9 @@ export function SettingsPage() {
     getSettings().then(s => { setSettings(s); initialSettings.current = s; setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-
+  useEffect(() => {
+    setSettingsDirty(hasChanges && !saving && !saved)
+  }, [hasChanges, saving, saved])
 
   const handleSave = async () => {
     setSaving(true)
@@ -87,16 +89,28 @@ export function SettingsPage() {
       await saveSettings(settings)
       setStoreSettings(settings)
       setSaved(true)
+      setSettingsDirty(false)
       await new Promise(r => setTimeout(r, 1200))
       setSaved(false)
     } catch {}
     setSaving(false)
   }
 
+  const handleCancel = () => {
+    setSettings({ ...initialSettings.current! })
+    initialSettings.current = null
+    setSettingsDirty(false)
+    setSettingsPopup(false)
+    if (settingsPopupAction && settingsPopupAction !== 'cancel') {
+      setPage(settingsPopupAction as Page)
+    }
+    setSettingsPopupAction(null)
+  }
+
   const doThemePreset = (preset: 'default' | 'pixelated-space') => {
     const updated = { ...settings, theme_preset: preset }
     setSettings(updated)
-    saveSettings(updated).catch(() => {})
+    setSettingsDirty(true)
     document.documentElement.setAttribute('data-theme-preset', preset)
   }
 
@@ -536,7 +550,7 @@ export function SettingsPage() {
 
           {hasChanges && (
             <div className="mt-6 flex items-center gap-3 justify-end">
-              <button onClick={() => { setSettings({ ...initialSettings.current! }); initialSettings.current = null }}
+              <button onClick={handleCancel}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-muted hover:text-text border border-border/30 hover:border-border-hover transition-all cursor-pointer">
                 Cancel
               </button>
@@ -549,6 +563,36 @@ export function SettingsPage() {
                 {saved ? <Check size={16} /> : null}
                 {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Settings'}
               </button>
+            </div>
+          )}
+
+          {/* Vencord-style unsaved changes popup */}
+          {settingsPopup && (
+            <div className="fixed inset-0 z-[400] flex items-center justify-center" onClick={() => setSettingsPopup(false)}>
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+              <div className="relative glass-modal rounded-2xl border border-accent/20 shadow-[0_16px_48px_rgba(0,0,0,0.6)] p-6 w-[340px] animate-modal-in" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center">
+                    <Sparkles size={15} className="text-accent" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-text">Unsaved Changes</p>
+                    <p className="text-[11px] text-muted/60 mt-0.5">You have unsaved settings</p>
+                  </div>
+                </div>
+                <div className="h-px bg-white/5 mb-4" />
+                <p className="text-xs text-dim leading-relaxed mb-5">Save your changes before leaving, or discard them.</p>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={handleCancel}
+                    className="px-4 py-2 rounded-xl text-sm font-medium text-muted hover:text-text border border-border/30 hover:border-border-hover transition-all cursor-pointer">
+                    Discard
+                  </button>
+                  <button onClick={handleSave} disabled={saving}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-accent text-white hover:brightness-110 transition-all cursor-pointer shadow-lg shadow-accent/20">
+                    Save
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </main>

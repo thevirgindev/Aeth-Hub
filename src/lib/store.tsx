@@ -8,6 +8,7 @@ interface Store {
   detailId: string | null; setDetailId: (id: string | null) => void
   detailType: string; setDetailType: (t: string) => void
   detailTitle: string; setDetailTitle: (t: string) => void
+  detailPoster: string; setDetailPoster: (t: string) => void
   episodeId: number | null; setEpisodeId: (id: number | null) => void
   episodeTitle: string; setEpisodeTitle: (t: string) => void
   episodeContentId: string; setEpisodeContentId: (id: string) => void
@@ -22,6 +23,9 @@ interface Store {
   user: User | null; setUser: (u: User | null) => void
   showSignup: boolean; setShowSignup: (v: boolean) => void
   updateInfo: UpdateInfo | null; setUpdateInfo: (i: UpdateInfo | null) => void
+  settingsDirty: boolean; setSettingsDirty: (v: boolean) => void
+  settingsPopup: boolean; setSettingsPopup: (v: boolean) => void
+  settingsPopupAction: 'save' | 'cancel' | null; setSettingsPopupAction: (v: 'save' | 'cancel' | null) => void
 }
 
 export interface Toast { id: number; msg: string; type: 'info' | 'success' | 'error' }
@@ -37,6 +41,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detailType, setDetailType] = useState('movie')
   const [detailTitle, setDetailTitle] = useState('')
+  const [detailPoster, setDetailPoster] = useState('')
   const [episodeId, setEpisodeId] = useState<number | null>(null)
   const [episodeTitle, setEpisodeTitle] = useState('')
   const [episodeContentId, setEpisodeContentId] = useState('')
@@ -56,11 +61,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [showSignup, setShowSignup] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const [settingsDirty, setSettingsDirty] = useState(false)
+  const [settingsPopup, setSettingsPopup] = useState(false)
+  const [settingsPopupAction, setSettingsPopupAction] = useState<'save' | 'cancel' | null>(null)
 
   const allowedPages: Page[] = ['home', 'movies', 'tvshows', 'kdramas', 'anime', 'hentai', 'games', 'detail', 'episode', 'downloads', 'settings', 'marketplace', 'watchtogether', 'watchlist', 'collection', 'profile', 'history']
 
   const handleSetPage = (p: Page) => {
     if (!allowedPages.includes(p)) return
+    if (page === 'settings' && settingsDirty && p !== 'settings') {
+      setSettingsPopup(true); setSettingsPopupAction(p as any)
+      return
+    }
     if (page !== p) {
       setPageHistory(prev => [...prev, page])
       if (page !== 'detail') setPrevPage(page)
@@ -69,6 +81,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   const goBack = () => {
+    if (page === 'settings' && settingsDirty) {
+      setSettingsPopup(true); setSettingsPopupAction('cancel')
+      return
+    }
     if (pageHistory.length > 0) {
       const prev = pageHistory[pageHistory.length - 1]
       setPageHistory(prev => prev.slice(0, -1))
@@ -95,14 +111,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       page, setPage: handleSetPage, prevPage, setPrevPage, goBack,
-      detailId, setDetailId, detailType, setDetailType, detailTitle, setDetailTitle,
+      detailId, setDetailId, detailType, setDetailType, detailTitle, setDetailTitle, detailPoster, setDetailPoster,
       episodeId, setEpisodeId, episodeTitle, setEpisodeTitle, episodeContentId, setEpisodeContentId,
       searchOpen, setSearchOpen, searchResults, setSearchResults,
       searchQuery, setSearchQuery, toast, showToast, clearToast, favs, setFavs,
       settings, setSettings: handleSetSettings, sidebarOpen, setSidebarOpen,
       dockOpen, setDockOpen,
       user, setUser, showSignup, setShowSignup,
-      updateInfo, setUpdateInfo
+      updateInfo, setUpdateInfo,
+      settingsDirty, setSettingsDirty, settingsPopup, setSettingsPopup, settingsPopupAction, setSettingsPopupAction
     }}>
       {children}
     </Ctx.Provider>

@@ -12,7 +12,7 @@ import { Play, Clock, Shuffle, Sparkles, Swords, Smile, Star } from 'lucide-reac
 const SECTION_GENRES = ['Drama', 'Action', 'Comedy'] as const
 
 export function HomePage() {
-  const { setPage, setDetailId, setDetailType, showToast } = useStore()
+  const { setPage, setDetailId, setDetailType, setDetailPoster } = useStore()
   const [anime, setAnime] = useState<CatalogItem[]>([])
   const [playback, setPlayback] = useState<PlaybackPos[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,15 +46,15 @@ export function HomePage() {
       year: a.year, rating: a.rating, genres: a.genres,
     }))
 
-  const openDetail = useCallback((id: string, type: string) => {
-    setDetailId(id); setDetailType(type); setPage('detail')
-  }, [setDetailId, setDetailType, setPage])
+  const openDetail = useCallback((id: string, type: string, poster?: string) => {
+    setDetailId(id); setDetailType(type); setDetailPoster(poster || ''); setPage('detail')
+  }, [setDetailId, setDetailType, setDetailPoster, setPage])
 
   const surprise = useCallback(() => {
-    const pool = anime.map(a => ({ id: a.id, type: 'anime' }))
+    const pool = anime.map(a => ({ id: a.id, type: 'anime', poster: a.poster }))
     if (pool.length === 0) return
     const pick = pool[Math.floor(Math.random() * pool.length)]
-    openDetail(pick.id, pick.type)
+    openDetail(pick.id, pick.type, pick.poster)
   }, [anime, openDetail])
 
   const continuePlayback = playback.filter(p => p.mtype === 'anime').slice(0, 6)
@@ -71,13 +71,17 @@ export function HomePage() {
     <div className="flex-1 animate-fade overflow-x-hidden">
       <HeroBanner
         items={heroItems}
-        onPlay={() => { showToast({ msg: 'Launching player...', type: 'info' }) }}
+        onPlay={(id) => openDetail(id, 'anime')}
         onDetail={(id) => openDetail(id, 'anime')}
       />
 
       <div className="px-6 -mt-2 relative z-10">
-        <div>
-          <p className="text-sm text-dim/70 mb-4">Discover and stream anime</p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-dim/70">Discover and stream anime</p>
+          <button onClick={surprise}
+            className="glass glass-hover rounded-xl px-3.5 py-1.5 text-xs text-dim flex items-center gap-1.5 cursor-pointer transition-all hover:text-text">
+            <Shuffle size={12} /> Surprise Me
+          </button>
         </div>
 
         {continueCards.length > 0 && (
@@ -87,10 +91,10 @@ export function HomePage() {
                 <Clock size={16} /> Continue Watching
                 <span className="h-[2px] flex-1 bg-gradient-to-r from-accent/30 to-transparent ml-2" />
               </h3>
-              <ArrowScrollRow>
+              <ArrowScrollRow carousel>
                 {continueCards.map(p => (
                   <div key={`${p.content_id}-${p.episode ?? ''}`}
-                    onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setPage('detail') }}
+                    onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setDetailPoster(p.poster); setPage('detail') }}
                     className="group/card relative w-[200px] shrink-0 rounded-xl overflow-hidden bg-surface border border-white/[0.06] hover:border-accent/30 transition-all duration-300 cursor-pointer">
                     {p.poster ? (
                       <div className="aspect-[2/3] overflow-hidden">
@@ -134,9 +138,9 @@ export function HomePage() {
                   <GIcon size={16} className="text-accent" /> {genre}
                   <span className="h-[2px] flex-1 bg-gradient-to-r from-accent/30 to-transparent ml-2" />
                 </h3>
-                <ArrowScrollRow>
+                <ArrowScrollRow carousel>
                   {genreItems.map(a => (
-                    <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime')} />
+                    <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime', a.poster)} />
                   ))}
                 </ArrowScrollRow>
               </section>
@@ -150,21 +154,14 @@ export function HomePage() {
               <Star size={16} className="text-accent" /> Top Anime
               <span className="h-[2px] flex-1 bg-gradient-to-r from-accent/30 to-transparent ml-2" />
             </h3>
-            <ArrowScrollRow>
+            <ArrowScrollRow carousel>
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => <AnimeCardSkeleton key={i} />)
                 : anime.slice(0, 20).map(a => (
-                    <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime')} />
+                    <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime', a.poster)} />
                   ))}
             </ArrowScrollRow>
           </section>
-        </div>
-
-        <div className="flex justify-center my-6">
-          <button onClick={surprise}
-            className="glass glass-hover rounded-xl px-5 py-2.5 text-sm text-dim flex items-center gap-2 cursor-pointer transition-all hover:text-text">
-            <Shuffle size={14} /> Surprise Me
-          </button>
         </div>
 
         <div className="h-8" />
