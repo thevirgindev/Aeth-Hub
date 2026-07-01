@@ -113,7 +113,9 @@ export function AnimePage() {
   return (
     <div className="flex-1 p-6 animate-fade">
       <div className="flex items-center gap-3 mb-4">
-          <span className="text-[#A855F7] text-lg">◆</span>
+          <div className="w-7 h-7 rounded-lg bg-[#A855F7]/15 flex items-center justify-center">
+            <BookOpen size={14} className="text-[#A855F7]" />
+          </div>
         <p className="text-sm text-dim">Anime & Manga — from shonen epics to slice-of-life gems</p>
       </div>
 
