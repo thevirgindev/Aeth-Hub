@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useStore } from '../lib/store'
 import { getPlayback } from '../lib/api'
 import type { Page, PlaybackPos } from '../lib/types'
 import {
-  Home, Clapperboard, Tv, Drama, Film, Gamepad2,
+  Home, Clapperboard, Tv, Drama, BookOpen, Gamepad2,
   Download, Bookmark, Settings,
   Compass, Library, Users, Clock,
   Store, FolderOpen, ExternalLink, ChevronLeft,
@@ -28,7 +29,7 @@ const sections: { label: string; icon: typeof Home; items: SectionItem[] }[] = [
       { page: 'home', icon: Home, label: 'Home' },
       { page: 'movies', icon: Clapperboard, label: 'Movies' },
       { page: 'tvshows', icon: Tv, label: 'TV Shows' },
-      { page: 'anime', icon: Film, label: 'Anime & Manga' },
+      { page: 'anime', icon: BookOpen, label: 'Anime & Manga' },
       { page: 'kdramas', icon: Drama, label: 'K-Dramas' },
     ],
   },
@@ -64,11 +65,47 @@ function AnimatedLabel({ show, children }: { show: boolean; children: React.Reac
   )
 }
 
-function Tooltip({ label }: { label: string }) {
+function Tooltip({ label, children }: { label: string; children?: React.ReactNode }) {
+  const [show, setShow] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const hideTimer = useRef(0)
+
+  const handleEnter = () => {
+    clearTimeout(hideTimer.current)
+    if (wrapRef.current) {
+      const r = wrapRef.current.getBoundingClientRect()
+      setPos({ x: r.right + 8, y: r.top + r.height / 2 })
+    }
+    setShow(true)
+  }
+
+  const handleLeave = () => {
+    hideTimer.current = window.setTimeout(() => setShow(false), 50)
+  }
+
+  useEffect(() => {
+    return () => clearTimeout(hideTimer.current)
+  }, [])
+
+  const child = children ? (
+    <div ref={wrapRef} onMouseEnter={handleEnter} onMouseLeave={handleLeave} className="contents">
+      {children}
+    </div>
+  ) : null
+
   return (
-    <span className="absolute left-[calc(100%+8px)] top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap bg-surface border border-accent/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-[16px] text-text opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-[999]">
-      {label}
-    </span>
+    <>
+      {child}
+      {show && createPortal(
+        <span style={{ left: pos.x, top: pos.y, transform: 'translateY(-50%)' }}
+          onMouseEnter={handleEnter} onMouseLeave={handleLeave}
+          className="fixed px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap bg-surface border border-accent/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-[16px] text-text z-[9999] pointer-events-auto">
+          {label}
+        </span>,
+        document.body
+      )}
+    </>
   )
 }
 
@@ -84,7 +121,7 @@ function SectionHeader({ icon: Icon, label }: { icon: typeof Home; label: string
 }
 
 const typeIcons: Record<string, typeof Home> = {
-  anime: Film, hentai: Film,
+  anime: BookOpen, hentai: BookOpen,
 }
 
 export function Sidebar() {
@@ -101,10 +138,10 @@ export function Sidebar() {
 
   return (
     <nav className={`glass-sidebar flex flex-col h-full rounded-tr-2xl rounded-br-2xl transition-all duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${sidebarOpen ? 'w-[240px]' : 'w-0'}`} style={{ willChange: 'width', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
-      <div className="flex flex-col w-full min-w-[240px] flex-1 overflow-y-auto overflow-x-hidden custom-scroll" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex flex-col w-full min-w-[240px] flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll custom-scroll" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(124,92,255,0.15) transparent' }}>
 
         {sidebarOpen && (
-          <div className="px-4 mb-3">
+          <div className="px-4 mb-3 mt-1">
             <button onClick={() => showToast({ msg: 'Sign in will be available in a future update', type: 'info' })}
               className="flex items-center gap-2.5 w-full px-3.5 py-2.5 rounded-xl bg-accent/8 border border-accent/15 hover:bg-accent/15 hover:border-accent/30 transition-all cursor-pointer group">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -131,10 +168,10 @@ export function Sidebar() {
                 {sidebarOpen && <SectionHeader icon={Clock} label="Quick Access" />}
                 {recent.map(p => {
                   const RIcon = typeIcons[p.mtype] || Clock
-                  return (
+                  const btn = (
                     <button key={`${p.content_id}-${p.episode ?? ''}`}
                       onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setPage('detail') }}
-                      className={`group relative flex items-center h-9 transition-all duration-150 cursor-pointer rounded-xl ${
+                      className={`relative flex items-center h-9 transition-all duration-150 cursor-pointer rounded-xl ${
                         sidebarOpen ? 'mx-[14px] w-[calc(100%-28px)]' : 'w-9 ml-[14px]'
                       } text-muted/60 hover:text-dim hover:bg-white/[0.04]`}>
                       <div className="w-9 h-9 flex items-center justify-center shrink-0">
@@ -145,9 +182,9 @@ export function Sidebar() {
                           <span className="text-sm block truncate">{p.title}</span>
                         </div>
                       )}
-                      {!sidebarOpen && <Tooltip label={p.title} />}
                     </button>
                   )
+                  return !sidebarOpen ? <Tooltip key={`${p.content_id}-${p.episode ?? ''}`} label={p.title}>{btn}</Tooltip> : btn
                 })}
               </div>
             ) : null
@@ -159,12 +196,12 @@ export function Sidebar() {
                 const Icon = i.icon
                 const active = page === i.page
                 const blocked = isBlocked(i.page)
-                return (
+                const btn = (
                   <button key={i.page} onClick={() => {
                     if (blocked) { showToast({ msg: 'Not available in this preview', type: 'info' }); return }
                     handleNav(i.page)
                   }}
-                    className={`group relative flex items-center h-9 transition-all duration-150 rounded-xl ${
+                    className={`relative flex items-center h-9 transition-all duration-150 rounded-xl ${
                       sidebarOpen ? 'mx-[14px] w-[calc(100%-28px)]' : 'w-9 ml-[14px]'
                     } ${blocked ? 'text-muted/30 cursor-not-allowed' : active ? 'text-text bg-white/[0.07] shadow-[inset_0_0_16px_rgba(124,92,255,0.1)] cursor-pointer' : 'text-muted/60 hover:text-dim hover:bg-white/[0.04] cursor-pointer'}`}>
                     {active && sidebarOpen && (
@@ -184,9 +221,9 @@ export function Sidebar() {
                         )}
                       </span>
                     </AnimatedLabel>
-                    {!sidebarOpen && <Tooltip label={i.label} />}
                   </button>
                 )
+                return !sidebarOpen ? <Tooltip key={i.page} label={i.label}>{btn}</Tooltip> : btn
               })}
               {section.label === 'Coming Soon' && sidebarOpen && recent.length > 0 && (
                 <div className="mt-2 px-4">
