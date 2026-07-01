@@ -58,7 +58,7 @@ export function ArrowScrollRow({ children, className = '', carousel }: ArrowScro
           className={`shrink-0 w-10 h-10 flex items-center justify-center bg-white/5 backdrop-blur-[4px] border border-white/10 rounded-xl text-muted hover:text-text hover:bg-white/15 hover:border-white/20 transition-all cursor-pointer mr-2 shadow-lg ${canScrollL ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <ChevronLeft size={18} />
         </button>
-        <div ref={rowRef} className={`overflow-x-auto scrollbar-none py-1 flex-1 flex gap-4 ${carousel ? '[&>*]:flex-1 [&>*]:min-w-[160px] [&>*]:max-w-[200px] snap-x snap-mandatory' : ''}`}
+        <div ref={rowRef} className={`overflow-x-auto scrollbar-none py-1 flex-1 flex gap-4 ${carousel ? '[&>*]:flex-1 [&>*]:min-w-[180px] [&>*]:max-w-[240px] snap-x snap-mandatory' : ''}`}
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', ...(carousel ? {} : { scrollSnapType: 'x mandatory' }) }}>
           {children}
         </div>
