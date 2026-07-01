@@ -137,7 +137,7 @@ export function Sidebar() {
   const isBlocked = (p: Page) => !(allowedPages as readonly string[]).includes(p)
 
   return (
-    <nav className={`glass-sidebar flex flex-col h-full rounded-tr-2xl rounded-br-2xl transition-all duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${sidebarOpen ? 'w-[240px]' : 'w-0'}`} style={{ willChange: 'width', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+    <nav className={`glass-sidebar flex flex-col h-full rounded-tr-2xl rounded-br-2xl transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${sidebarOpen ? 'w-[240px]' : 'w-0'}`} style={{ willChange: 'width', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
       <div className="flex flex-col w-full min-w-[240px] flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll custom-scroll" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(124,92,255,0.15) transparent' }}>
 
         {sidebarOpen && (

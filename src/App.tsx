@@ -275,7 +275,7 @@ export default function App() {
       </div>
       <ContextMenuProvider>
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          {sidebarOpen && <div className="w-[240px] shrink-0 transition-all duration-[200ms]" />}
+          {sidebarOpen && <div className="w-[240px] shrink-0 transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]" />}
           {!sidebarOpen && (
             <div className="fixed left-[14px] top-[50%] -translate-y-1/2 z-[60]">
               <button onClick={() => setSidebarOpen(true)}
