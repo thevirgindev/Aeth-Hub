@@ -7,9 +7,9 @@ import { useStore } from '../lib/store'
 import { browseCatalog, getPlayback } from '../lib/api'
 import { preloadBatch } from '../lib/img-cache'
 import type { CatalogItem, PlaybackPos } from '../lib/types'
-import { Play, Clock, Shuffle, Sparkles, Swords, Smile, Star } from 'lucide-react'
+import { Play, Clock, Shuffle, Sparkles, Swords, Star, Wand, Skull } from 'lucide-react'
 
-const SECTION_GENRES = ['Drama', 'Action', 'Comedy'] as const
+const SECTION_GENRES = ['Drama', 'Action', 'Thriller'] as const
 
 export function HomePage() {
   const { setPage, setDetailId, setDetailType, setDetailPoster } = useStore()
@@ -64,7 +64,7 @@ export function HomePage() {
   }))
 
   const genreIcons: Record<string, typeof Swords> = {
-    Drama: Sparkles, Action: Swords, Comedy: Smile,
+    Drama: Wand, Action: Swords, Thriller: Skull,
   }
 
   return (
