@@ -15,10 +15,10 @@
         "title": "Aeth Hub",
         "width": 1280,
         "height": 800,
-        "resizable": false,
+        "resizable": true,
         "fullscreen": false,
         "decorations": false,
-        "shadow": false,
+        "shadow": true,
         "center": true,
         "backgroundColor": "#08080A"
       }

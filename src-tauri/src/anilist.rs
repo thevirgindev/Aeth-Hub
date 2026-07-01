@@ -95,17 +95,35 @@ fn anilist_item_to_catalog(item: &Value, kind: &str) -> Option<CatalogItem> {
 }
 
 pub async fn browse(http: &Client, genre: &str, sort: &str, page: usize, limit: usize, media_type: &str) -> Result<BrowseResult, String> {
-    let genre_val = if genre != "All" { json!(genre) } else { json!(null) };
-    let body = json!({
-        "query": BROWSE_QUERY,
-        "variables": {
-            "page": page,
-            "perPage": limit,
-            "genre": genre_val,
-            "sort": [anilist_sort(sort)],
-            "type": media_type,
-        }
+    let query = if genre != "All" {
+        r#"query ($page: Int, $perPage: Int, $genre: String, $sort: [MediaSort], $type: MediaType) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo { total }
+    media(type: $type, genre: $genre, sort: $sort, isAdult: false) {
+      id title { romaji english } coverImage { large } averageScore genres episodes chapters status seasonYear description
+    }
+  }
+}"#
+    } else {
+        r#"query ($page: Int, $perPage: Int, $sort: [MediaSort], $type: MediaType) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo { total }
+    media(type: $type, sort: $sort, isAdult: false) {
+      id title { romaji english } coverImage { large } averageScore genres episodes chapters status seasonYear description
+    }
+  }
+}"#
+    };
+    let mut vars = json!({
+        "page": page,
+        "perPage": limit,
+        "sort": [anilist_sort(sort)],
+        "type": media_type,
     });
+    if genre != "All" {
+        vars["genre"] = json!(genre);
+    }
+    let body = json!({ "query": query, "variables": vars });
     let resp = http.post(API).json(&body).send().await.map_err(|e| e.to_string())?;
     let data: Value = resp.json().await.map_err(|e| e.to_string())?;
     let page = data.pointer("/data/Page").ok_or("missing Page")?;

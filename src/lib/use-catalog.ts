@@ -15,6 +15,7 @@ export function usePaginatedCatalog(kind: string, genre: string, sort: string) {
   const kindRef = useRef(kind)
   const genreRef = useRef(genre)
   const sortRef = useRef(sort)
+  const initialLoadRef = useRef(false)
 
   const loadMore = useCallback(async () => {
     if (kindRef.current === 'none') { setLoading(false); return }
@@ -36,9 +37,29 @@ export function usePaginatedCatalog(kind: string, genre: string, sort: string) {
     offsetRef.current = 0
     setLoading(true)
     setLoadingMore(false)
+    initialLoadRef.current = false
     if (kind === 'none') { setLoading(false); return }
     loadMore()
   }, [kind, genre, sort, loadMore])
+
+  // Fetch extra initial pages for remote API catalogs
+  useEffect(() => {
+    if (loading || initialLoadRef.current || items.length === 0) return
+    if ((kind === 'anime' || kind === 'manga' || kind === 'game') && offsetRef.current < total && items.length < 100) {
+      initialLoadRef.current = true
+      loadMore()
+    }
+  }, [loading, items.length, kind, total, loadMore])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || kind === 'none') return
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && offsetRef.current < total && !loading) loadMore()
+    }, { rootMargin: '400px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [loadMore, total, loading, kind])
 
   useEffect(() => {
     const el = sentinelRef.current

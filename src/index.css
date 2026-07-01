@@ -45,7 +45,7 @@
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; transition: background 0.2s; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 
-html { background: #08080A; margin: 0; padding: 0; border-radius: 12px; overflow: hidden; }
+html { background: #08080A; margin: 0; padding: 0; border-radius: 12px; overflow: hidden; clip-path: inset(0 round 12px); }
 #root { background: #08080A; margin: 0; padding: 0; min-height: 100vh; min-width: 100vw; border-radius: 12px; overflow: hidden; }
 
 body {
@@ -86,13 +86,7 @@ input, textarea, [contenteditable], code, kbd, pre { user-select: auto; -webkit-
   pointer-events: none;
 }
 .sidebar-wrapper {
-  position: relative;
-  overflow: hidden;
   border-radius: 0 24px 24px 0;
-}
-.sidebar-wrapper > .glass-sidebar {
-  position: absolute;
-  inset: 0;
 }
 
 .card-surface { background: #111521; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06); transition: all 0.25s cubic-bezier(0.2,0.8,0.4,1); will-change: transform; }

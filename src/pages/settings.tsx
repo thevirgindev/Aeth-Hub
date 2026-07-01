@@ -150,15 +150,15 @@ export function SettingsPage() {
         <div className="mt-3 h-px bg-gradient-to-r from-accent/30 via-accent/10 to-transparent" />
       </div>
 
-      <div className="flex flex-wrap items-center gap-0.5 mb-4 bg-white/[0.03] rounded-lg p-0.5 border border-border/30">
+      <div className="flex items-center gap-0.5 mb-3 bg-white/[0.03] rounded-xl p-0.5 border border-border/30 w-max overflow-x-auto shrink-0">
         {navItems.map(item => (
           <button key={item.id} onClick={() => setActiveSection(item.id)}
-            className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap cursor-pointer ${
               activeSection === item.id
                 ? 'bg-accent text-white shadow-sm'
                 : 'text-muted/60 hover:text-text hover:bg-white/5'
             }`}>
-            <item.icon size={10} />
+            <item.icon size={12} />
             {item.label}
           </button>
         ))}
