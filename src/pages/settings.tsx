@@ -88,8 +88,14 @@ export function SettingsPage() {
     try {
       await saveSettings(settings)
       setStoreSettings(settings)
+      initialSettings.current = { ...settings }
       setSaved(true)
       setSettingsDirty(false)
+      setSettingsPopup(false)
+      if (settingsPopupAction && settingsPopupAction !== 'cancel') {
+        setPage(settingsPopupAction as Page)
+      }
+      setSettingsPopupAction(null)
       await new Promise(r => setTimeout(r, 1200))
       setSaved(false)
     } catch {}
@@ -568,7 +574,7 @@ export function SettingsPage() {
 
           {/* Vencord-style unsaved changes popup */}
           {settingsPopup && (
-            <div className="fixed inset-0 z-[400] flex items-center justify-center" onClick={() => setSettingsPopup(false)}>
+            <div className="fixed inset-0 z-[400] flex items-center justify-center" onClick={handleCancel}>
               <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
               <div className="relative glass-modal rounded-2xl border border-accent/20 shadow-[0_16px_48px_rgba(0,0,0,0.6)] p-6 w-[340px] animate-modal-in" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-3 mb-4">
