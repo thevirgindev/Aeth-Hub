@@ -17,7 +17,7 @@ const PATREON_URL = 'https://patreon.com/thevirgindev'
 const KOFI_URL = 'https://ko-fi.com/thevirgindev'
 const PROPELLER_URL = 'https://propellerads.com'
 
-const allowedPages = ['home', 'anime', 'detail', 'downloads', 'settings', 'history'] as const
+const allowedPages = ['home', 'anime', 'detail', 'downloads', 'settings', 'history', 'watchlist'] as const
 
 type SectionItem = { page: Page; icon: typeof Home; label: string; tag?: string }
 
@@ -66,7 +66,7 @@ function AnimatedLabel({ show, children }: { show: boolean; children: React.Reac
 
 function Tooltip({ label }: { label: string }) {
   return (
-    <span className="absolute left-full ml-2.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap bg-surface border border-accent/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-[16px] text-text opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 pointer-events-none z-50 before:absolute before:left-[-4px] before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:bg-surface before:border-l before:border-b before:border-accent/20 before:rotate-45">
+    <span className="absolute left-[calc(100%+8px)] top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap bg-surface border border-accent/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-[16px] text-text opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-[999]">
       {label}
     </span>
   )
@@ -103,6 +103,26 @@ export function Sidebar() {
     <nav className={`glass-sidebar flex flex-col h-full rounded-tr-2xl rounded-br-2xl transition-all duration-[200ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${sidebarOpen ? 'w-[240px]' : 'w-0'}`} style={{ willChange: 'width', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
       <div className="flex flex-col w-full min-w-[240px] flex-1 overflow-y-auto overflow-x-hidden custom-scroll" style={{ scrollbarWidth: 'none' }}>
 
+        {sidebarOpen && (
+          <div className="px-4 mb-3">
+            <button onClick={() => showToast({ msg: 'Sign in will be available in a future update', type: 'info' })}
+              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 rounded-xl bg-accent/8 border border-accent/15 hover:bg-accent/15 hover:border-accent/30 transition-all cursor-pointer group">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent/80">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                  <polyline points="10 17 15 12 10 7"/>
+                  <line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-xs font-semibold text-text/70 group-hover:text-text transition-colors">Sign In</p>
+                <p className="text-[9px] text-muted/40">Sync across devices</p>
+              </div>
+              <div className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-[0.15em] text-muted/30 bg-white/[0.03] border border-white/5">Soon</div>
+            </button>
+          </div>
+        )}
+
         {sections.map(section => {
           const SecIcon = section.icon
           if (section.label === 'Quick Access') {
@@ -114,7 +134,7 @@ export function Sidebar() {
                   return (
                     <button key={`${p.content_id}-${p.episode ?? ''}`}
                       onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setPage('detail') }}
-                      className={`group/tooltip relative flex items-center h-9 transition-all duration-150 cursor-pointer rounded-xl ${
+                      className={`group relative flex items-center h-9 transition-all duration-150 cursor-pointer rounded-xl ${
                         sidebarOpen ? 'mx-[14px] w-[calc(100%-28px)]' : 'w-9 ml-[14px]'
                       } text-muted/60 hover:text-dim hover:bg-white/[0.04]`}>
                       <div className="w-9 h-9 flex items-center justify-center shrink-0">
@@ -144,7 +164,7 @@ export function Sidebar() {
                     if (blocked) { showToast({ msg: 'Not available in this preview', type: 'info' }); return }
                     handleNav(i.page)
                   }}
-                    className={`group/tooltip relative flex items-center h-9 transition-all duration-150 rounded-xl ${
+                    className={`group relative flex items-center h-9 transition-all duration-150 rounded-xl ${
                       sidebarOpen ? 'mx-[14px] w-[calc(100%-28px)]' : 'w-9 ml-[14px]'
                     } ${blocked ? 'text-muted/30 cursor-not-allowed' : active ? 'text-text bg-white/[0.07] shadow-[inset_0_0_16px_rgba(124,92,255,0.1)] cursor-pointer' : 'text-muted/60 hover:text-dim hover:bg-white/[0.04] cursor-pointer'}`}>
                     {active && sidebarOpen && (
@@ -212,8 +232,10 @@ export function Sidebar() {
                   className="w-7 h-7 rounded-lg text-muted/30 hover:text-text hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center"
                   title="Check for updates">
                   <div className="relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill={updateInfo?.available ? '#22c55e' : 'currentColor'} className={updateInfo?.available ? 'opacity-80' : ''}>
-                      <path d="M5.5 3C3.56 3 2 4.56 2 6.5v8c0 1.94 1.56 3.5 3.5 3.5H8v5l5.16-4.39A2.5 2.5 0 0 1 14.95 17h3.55c1.94 0 3.5-1.56 3.5-3.5v-8C22 4.56 20.44 3 18.5 3h-13zM12 7.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-5 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm10 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={updateInfo?.available ? '#22c55e' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="23 4 23 10 17 10"/>
+                      <polyline points="1 20 1 14 7 14"/>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                     </svg>
                     {updateInfo?.available && (
                       <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-400 animate-ping" />
@@ -225,24 +247,6 @@ export function Sidebar() {
                 className="flex items-center justify-center w-7 h-7 rounded-lg text-muted/40 hover:text-text hover:bg-white/10 transition-all cursor-pointer"
                 title="Collapse sidebar (Ctrl+S)">
                 <ChevronLeft size={14} />
-              </button>
-            </div>
-
-            <div className="px-4 mb-3">
-              <button onClick={() => showToast({ msg: 'Sign in will be available in a future update', type: 'info' })}
-                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 rounded-xl bg-accent/8 border border-accent/15 hover:bg-accent/15 hover:border-accent/30 transition-all cursor-pointer group">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent/80">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-                    <polyline points="10 17 15 12 10 7"/>
-                    <line x1="15" y1="12" x2="3" y2="12"/>
-                  </svg>
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-xs font-semibold text-text/70 group-hover:text-text transition-colors">Sign In</p>
-                  <p className="text-[9px] text-muted/40">Sync across devices</p>
-                </div>
-                <div className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-[0.15em] text-muted/30 bg-white/[0.03] border border-white/5">Soon</div>
               </button>
             </div>
 

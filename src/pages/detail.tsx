@@ -281,12 +281,12 @@ export function DetailPage() {
                     await addToLibrary(detailId, title, poster)
                     setInLibrary(true)
                     setAddingToLib(false)
-                    showToast({ msg: 'Added to library', type: 'success' })
+                    showToast({ msg: 'Added to watchlist', type: 'success' })
                   }}>
-                  {addingToLib ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />} Add
+                  {addingToLib ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />} Add to Watchlist
                 </Button>
               )}
-              {inLibrary && <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-[4px] uppercase bg-[rgba(124,92,255,0.15)] text-accent"><Check size={12} /> In Library</span>}
+              {inLibrary && <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-[4px] uppercase bg-[rgba(124,92,255,0.15)] text-accent"><Check size={12} /> In Watchlist</span>}
               <Button variant={favs.includes(detailId || '') ? 'primary' : 'ghost'} size="md"
                 onClick={async () => {
                   if (!detailId) return
@@ -349,85 +349,69 @@ export function DetailPage() {
 
             {hasSeasons && (
               <div className="flex-1 min-w-0">
-                {inLibrary ? (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-semibold text-text">Episodes</h3>
-                      <select value={selectedSeason ?? series.seasons[0].num}
-                        onChange={(e) => setSelectedSeason(Number(e.target.value))}
-                        className="bg-surface text-text border border-border/30 rounded-lg px-3 py-1.5 text-sm cursor-pointer">
-                        {series.seasons.map(s => (
-                          <option key={s.num} value={s.num}>Season {s.num}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {(() => {
-                      const season = series.seasons.find(s => s.num === selectedSeason)
-                      if (!season) return null
-                      return (
-                        <div className="max-h-[520px] overflow-y-auto space-y-1 pr-1">
-                          {season.episodes.map(ep => (
-                            <div key={ep.num} onClick={() => {
-                              setEpisodeId(ep.num); setEpisodeTitle(ep.title || `Episode ${ep.num}`); setEpisodeContentId(series.id); setPage('episode')
-                            }}
-                              className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all select-none cursor-pointer bg-surface/40 border border-border/20 hover:bg-white/8 hover:border-border-hover group/ep">
-                              <div className="w-8 h-8 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-accent">{ep.num}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-text truncate">{ep.title || `Episode ${ep.num}`}</p>
-                              </div>
-                              <Play size={14} className="text-muted/40 group-hover/ep:text-accent transition-colors shrink-0" />
-                            </div>
-                          ))}
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-semibold text-text">Episodes</h3>
+                  <select value={selectedSeason ?? series.seasons[0].num}
+                    onChange={(e) => setSelectedSeason(Number(e.target.value))}
+                    className="bg-surface text-text border border-border/30 rounded-lg px-3 py-1.5 text-sm cursor-pointer">
+                    {series.seasons.map(s => (
+                      <option key={s.num} value={s.num}>Season {s.num}</option>
+                    ))}
+                  </select>
+                </div>
+                {(() => {
+                  const season = series.seasons.find(s => s.num === selectedSeason)
+                  if (!season) return null
+                  return (
+                    <div className="max-h-[520px] overflow-y-auto space-y-1 pr-1">
+                      {season.episodes.map(ep => (
+                        <div key={ep.num} onClick={() => {
+                          setEpisodeId(ep.num); setEpisodeTitle(ep.title || `Episode ${ep.num}`); setEpisodeContentId(series.id); setPage('episode')
+                        }}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all select-none cursor-pointer bg-surface/40 border border-border/20 hover:bg-white/8 hover:border-border-hover group/ep">
+                          <div className="w-8 h-8 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-accent">{ep.num}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-text truncate">{ep.title || `Episode ${ep.num}`}</p>
+                          </div>
+                          <Play size={14} className="text-muted/40 group-hover/ep:text-accent transition-colors shrink-0" />
                         </div>
-                      )
-                    })()}
-                  </>
-                ) : (
-                  <div className="glass rounded-xl p-5 text-center border border-border/50">
-                    <p className="text-sm text-dim">Add to library to access episodes</p>
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
             {hasAnimeEps && (
               <div className="flex-1 min-w-0">
-                {inLibrary ? (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-semibold text-text">Episodes</h3>
-                      <span className="text-xs text-muted">{anime.eps} total</span>
-                    </div>
-                    <div className="max-h-[520px] overflow-y-auto space-y-1 pr-1">
-                      {Array.from({ length: Math.min(anime.eps, 50) }, (_, i) => {
-                        const epNum = i + 1
-                        return (
-                          <div key={epNum} onClick={() => {
-                            setEpisodeId(epNum); setEpisodeTitle(anime.title); setEpisodeContentId(anime.id); setPage('episode')
-                          }}
-                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all select-none cursor-pointer bg-surface/40 border border-border/20 hover:bg-white/8 hover:border-border-hover group/ep">
-                            <div className="w-8 h-8 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
-                              <span className="text-xs font-bold text-accent">{epNum}</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-text">Episode {epNum}</p>
-                            </div>
-                            <Play size={14} className="text-muted/40 group-hover/ep:text-accent transition-colors shrink-0" />
-                          </div>
-                        )
-                      })}
-                      {anime.eps > 50 && (
-                        <p className="text-center text-xs text-muted/50 pt-2">+ {anime.eps - 50} more episodes</p>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="glass rounded-xl p-5 text-center border border-border/50">
-                    <p className="text-sm text-dim">Add to library to access episodes</p>
-                  </div>
-                )}
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-semibold text-text">Episodes</h3>
+                  <span className="text-xs text-muted">{anime.eps} total</span>
+                </div>
+                <div className="max-h-[520px] overflow-y-auto space-y-1 pr-1">
+                  {Array.from({ length: Math.min(anime.eps, 50) }, (_, i) => {
+                    const epNum = i + 1
+                    return (
+                      <div key={epNum} onClick={() => {
+                        setEpisodeId(epNum); setEpisodeTitle(anime.title); setEpisodeContentId(anime.id); setPage('episode')
+                      }}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all select-none cursor-pointer bg-surface/40 border border-border/20 hover:bg-white/8 hover:border-border-hover group/ep">
+                        <div className="w-8 h-8 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-accent">{epNum}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-text">Episode {epNum}</p>
+                        </div>
+                        <Play size={14} className="text-muted/40 group-hover/ep:text-accent transition-colors shrink-0" />
+                      </div>
+                    )
+                  })}
+                  {anime.eps > 50 && (
+                    <p className="text-center text-xs text-muted/50 pt-2">+ {anime.eps - 50} more episodes</p>
+                  )}
+                </div>
               </div>
             )}
           </div>

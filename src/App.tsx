@@ -5,14 +5,14 @@ import { Titlebar } from './components/titlebar'
 import { Sidebar } from './components/sidebar'
 import { Toast } from './components/toast'
 import { SearchOverlay } from './pages/search-overlay'
-import { FloatingDock } from './components/floating-dock'
+
 import { ContextMenuProvider } from './components/context-menu'
 import type { UserTheme } from './lib/types'
 import { checkForUpdate } from './lib/update-check'
 import { DownloadBar } from './components/download-bar'
 import { Welcome } from './components/welcome'
 import { SignupModal } from './components/signup-modal'
-import { ChevronsRight, Container, X } from 'lucide-react'
+import { PanelRightOpen, X } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-shell'
 
 const HomePage = lazy(() => import('./pages/home').then(m => ({ default: m.HomePage })))
@@ -52,42 +52,7 @@ const pageEntries: [string, React.LazyExoticComponent<React.ComponentType>][] = 
 ]
 
 export default function App() {
-  const { page, setPage, prevPage, setSettings, setFavs, settings, detailType, detailTitle, showToast, sidebarOpen, setSidebarOpen, dockOpen, setDockOpen, updateInfo, setUpdateInfo, goBack } = useStore()
-  const [btnPos, setBtnPos] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('aeth-qmenu-pos') || 'null') || { x: 16, y: 50 } } catch { return { x: 16, y: 50 } }
-  })
-  const [dragging, setDragging] = useState(false)
-  const dragRef = useRef({ startX: 0, startY: 0, origX: 0, origY: 0 })
-  const deltaRef = useRef({ dx: 0, dy: 0 })
-  const btnRef = useRef<HTMLDivElement>(null)
-  const onBtnDown = (e: React.MouseEvent) => {
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: btnPos.x, origY: btnPos.y }
-    deltaRef.current = { dx: 0, dy: 0 }
-    setDragging(true)
-  }
-  useEffect(() => {
-    if (!dragging) return
-    const onMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragRef.current.startX
-      const dy = e.clientY - dragRef.current.startY
-      deltaRef.current = { dx, dy }
-      if (btnRef.current) {
-        btnRef.current.style.transform = `translate(${dx}px, ${dy}px)`
-      }
-    }
-    const onUp = () => {
-      setDragging(false)
-      if (btnRef.current) btnRef.current.style.transform = ''
-      const newX = Math.max(0, Math.min(window.innerWidth - 64, dragRef.current.origX + deltaRef.current.dx))
-      const newY = Math.max(0, Math.min(90, dragRef.current.origY + (deltaRef.current.dy / window.innerHeight) * 100))
-      const finalPos = { x: newX, y: newY }
-      setBtnPos(finalPos)
-      localStorage.setItem('aeth-qmenu-pos', JSON.stringify(finalPos))
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
-  }, [dragging])
+  const { page, setPage, prevPage, setSettings, setFavs, settings, detailType, detailTitle, showToast, sidebarOpen, setSidebarOpen, updateInfo, setUpdateInfo, goBack } = useStore()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme-preset', settings.theme_preset || 'default')
@@ -181,11 +146,11 @@ export default function App() {
           setSidebarOpen(!sidebarOpen)
         }
 
-        if (e.altKey && e.key >= '1' && e.key <= '8') {
+        if (e.altKey && e.key >= '1' && e.key <= '9') {
           e.preventDefault()
           const pageShortcuts = [
             'home', 'movies', 'tvshows', 'kdramas', 'anime',
-            'games', 'downloads', 'settings'
+            'games', 'downloads', 'watchlist', 'settings'
           ] as const
           const targetPage = pageShortcuts[parseInt(e.key, 10) - 1]
           if (targetPage) {
@@ -309,21 +274,12 @@ export default function App() {
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {sidebarOpen && <div className="w-[240px] shrink-0 transition-all duration-[200ms]" />}
           {!sidebarOpen && (
-            <div ref={btnRef} className="fixed z-[60] flex flex-col gap-3" style={{ left: btnPos.x, top: `${btnPos.y}%` }}>
+            <div className="fixed left-[14px] top-[50%] -translate-y-1/2 z-[60]">
               <button onClick={() => setSidebarOpen(true)}
-                className="w-12 h-12 rounded-full bg-surface/60 backdrop-blur-xl border border-white/10 shadow-lg hover:bg-surface/80 hover:border-accent/30 transition-all duration-150 cursor-pointer flex items-center justify-center group"
+                className="w-10 h-10 rounded-xl bg-surface/70 backdrop-blur-xl border border-white/10 shadow-lg hover:bg-surface/90 hover:border-accent/30 hover:shadow-[0_0_20px_rgba(124,92,255,0.15)] transition-all duration-200 cursor-pointer flex items-center justify-center group"
                 title="Open sidebar">
-                <ChevronsRight size={16} className="text-muted group-hover:text-accent transition-colors" />
+                <PanelRightOpen size={16} className="text-muted/60 group-hover:text-accent transition-colors" />
               </button>
-              {!dockOpen && (
-                <div onMouseDown={onBtnDown} className="cursor-grab active:cursor-grabbing">
-                  <button onClick={() => setDockOpen(true)}
-                    className="w-12 h-12 rounded-full bg-accent/80 backdrop-blur-xl shadow-[0_0_20px_rgba(124,92,255,0.3)] hover:shadow-[0_0_32px_rgba(124,92,255,0.5)] hover:scale-105 hover:ring-2 hover:ring-accent/40 transition-all duration-150 pointer-events-auto flex items-center justify-center group"
-                    title="Quick menu — drag to reposition">
-                    <Container size={18} className="text-white" />
-                  </button>
-                </div>
-              )}
             </div>
           )}
           <div className="flex-1 overflow-y-auto min-h-0 page-scroll">
@@ -347,7 +303,6 @@ export default function App() {
       <DownloadBar />
       <Toast />
       <SearchOverlay />
-      <FloatingDock />
       {showWelcome && <Welcome onDismiss={handleWelcomeDismiss} />}
       {showUpdateNotif && updateInfo?.available && (
         <div className={`fixed bottom-4 right-4 z-[300] w-[300px] glass-modal rounded-xl border border-green-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden ${dismissingUpdate ? 'animate-fade-out' : 'animate-slide-up'}`}>

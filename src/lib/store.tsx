@@ -19,7 +19,6 @@ interface Store {
   favs: string[]; setFavs: (f: string[]) => void
   settings: AppSettings; setSettings: (s: AppSettings) => void
   sidebarOpen: boolean; setSidebarOpen: (v: boolean) => void
-  dockOpen: boolean; setDockOpen: (v: boolean) => void
   user: User | null; setUser: (u: User | null) => void
   showSignup: boolean; setShowSignup: (v: boolean) => void
   updateInfo: UpdateInfo | null; setUpdateInfo: (i: UpdateInfo | null) => void
@@ -57,7 +56,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     onboarded: false, theme_mode: 'dark', theme_preset: 'default',
   })
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [dockOpen, setDockOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [showSignup, setShowSignup] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
@@ -116,7 +114,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       searchOpen, setSearchOpen, searchResults, setSearchResults,
       searchQuery, setSearchQuery, toast, showToast, clearToast, favs, setFavs,
       settings, setSettings: handleSetSettings, sidebarOpen, setSidebarOpen,
-      dockOpen, setDockOpen,
       user, setUser, showSignup, setShowSignup,
       updateInfo, setUpdateInfo,
       settingsDirty, setSettingsDirty, settingsPopup, setSettingsPopup, settingsPopupAction, setSettingsPopupAction

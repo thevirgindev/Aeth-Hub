@@ -79,8 +79,11 @@ export function HomePage() {
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-dim/70">Discover and stream anime</p>
           <button onClick={surprise}
-            className="glass glass-hover rounded-xl px-3.5 py-1.5 text-xs text-dim flex items-center gap-1.5 cursor-pointer transition-all hover:text-text">
-            <Shuffle size={12} /> Surprise Me
+            className="group relative px-4 py-2 rounded-xl text-xs font-semibold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 hover:border-accent/40 hover:shadow-[0_0_20px_rgba(124,92,255,0.25)] transition-all duration-200 cursor-pointer flex items-center gap-2">
+            <span className="relative flex items-center gap-2">
+              <Shuffle size={13} className="group-hover:rotate-180 transition-transform duration-500" />
+              <span>Surprise Me</span>
+            </span>
           </button>
         </div>
 
