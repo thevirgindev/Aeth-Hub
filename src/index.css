@@ -310,7 +310,34 @@ input, textarea, [contenteditable], code, kbd, pre { user-select: auto; -webkit-
   animation: modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Focus outline ring accessibility standard */
+/* Player range input styling */
+input[type="range"].player-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+  height: 4px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].player-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7C5CFF;
+  border: 2px solid white;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(124,92,255,0.4);
+}
+input[type="range"].player-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7C5CFF;
+  border: 2px solid white;
+  cursor: pointer;
+}
 *:focus-visible {
   outline: 2px solid var(--theme-accent, #7C5CFF) !important;
   outline-offset: 2px !important;

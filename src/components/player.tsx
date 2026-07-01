@@ -179,11 +179,19 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
           </div>
         )}
         <video ref={videoRef} src={isMagnet ? undefined : url}
-          className={`max-w-full max-h-full w-auto h-auto ${torrentStatus ? 'opacity-0' : 'opacity-100'}`}
+          className={`absolute inset-0 w-full h-full object-contain ${torrentStatus ? 'opacity-0' : 'opacity-100'}`}
           onClick={togglePlay}
-          crossOrigin="anonymous" />
+          playsInline />
+        <div className="absolute top-3 right-3 z-20">
+          <button onClick={onClose} className="text-white/60 hover:text-white cursor-pointer transition-colors p-2 bg-black/30 rounded-lg backdrop-blur-sm">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="absolute top-3 left-4 z-20">
+          <span className="text-white/60 text-sm truncate max-w-[300px] block bg-black/30 px-2 py-1 rounded-lg backdrop-blur-sm">{title}</span>
+        </div>
         <div ref={controlsRef}
-          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-12 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-12 transition-opacity duration-300 z-10 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <div className="max-w-4xl mx-auto">
             <input type="range" min={0} max={duration || 0} value={currentTime} onChange={handleSeek}
               className="w-full h-1 accent-accent cursor-pointer mb-3 player-range" />
@@ -222,14 +230,6 @@ export function Player({ url, title, poster, onClose }: PlayerProps) {
                 </button>
               </div>
             </div>
-          </div>
-          <div className="absolute top-3 right-3">
-            <button onClick={onClose} className="text-white/60 hover:text-white cursor-pointer transition-colors p-1">
-              <X size={20} />
-            </button>
-          </div>
-          <div className="absolute top-3 left-4">
-            <span className="text-white/60 text-sm truncate max-w-[300px] block">{title}</span>
           </div>
         </div>
       </div>
