@@ -4,24 +4,6 @@ use serde_json::{json, Value};
 
 const API: &str = "https://graphql.anilist.co";
 
-const BROWSE_QUERY: &str = r#"
-query ($page: Int, $perPage: Int, $genre: String, $sort: [MediaSort], $type: MediaType) {
-  Page(page: $page, perPage: $perPage) {
-    pageInfo { total }
-    media(type: $type, genre: $genre, sort: $sort, isAdult: false) {
-      id title { romaji english }
-      coverImage { large }
-      averageScore
-      genres
-      episodes
-      chapters
-      status
-      seasonYear
-      description
-    }
-  }
-}"#;
-
 const SEARCH_QUERY: &str = r#"
 query ($page: Int, $perPage: Int, $search: String, $type: MediaType) {
   Page(page: $page, perPage: $perPage) {

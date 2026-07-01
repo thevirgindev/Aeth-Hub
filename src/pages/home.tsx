@@ -124,7 +124,7 @@ export function HomePage() {
         )}
 
         {SECTION_GENRES.map((genre, gi) => {
-          const genreItems = anime.filter(a => a.genres.includes(genre)).slice(0, 5)
+          const genreItems = anime.filter(a => a.genres.includes(genre)).slice(0, 15)
           if (genreItems.length === 0) return null
           const GIcon = genreIcons[genre] || Sparkles
           return (
@@ -153,7 +153,7 @@ export function HomePage() {
             <ArrowScrollRow>
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-                : anime.slice(0, 5).map(a => (
+                : anime.slice(0, 20).map(a => (
                     <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime')} />
                   ))}
             </ArrowScrollRow>

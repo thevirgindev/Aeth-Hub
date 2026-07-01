@@ -15,7 +15,8 @@ export function ArrowScrollRow({ children, className = '' }: ArrowScrollRowProps
     const el = rowRef.current
     if (!el) return
     setCanScrollL(el.scrollLeft > 4)
-    setCanScrollR(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+    const hasOverflow = el.scrollWidth > el.clientWidth
+    setCanScrollR(hasOverflow && el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
   }
 
   useEffect(() => {

@@ -804,7 +804,7 @@ fn urlencoding(s: &str) -> String {
         'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => {
             let mut b = [0u8; 4];
             let n = c.encode_utf8(&mut b).len();
-            (0..n).map(move |i| b[i].to_string()).collect::<Vec<_>>()
+            (0..n).map(move |i| (b[i] as char).to_string()).collect::<Vec<_>>()
         }
         ' ' => vec!["+".to_string()],
         c => {
