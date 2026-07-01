@@ -264,7 +264,10 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-deep text-text overflow-hidden relative">
-      <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-[#0c0b11] via-deep to-[#1a173e] -z-10" />
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-deep">
+        <div className="absolute inset-0 opacity-30 animate-gradient"
+          style={{ background: 'linear-gradient(135deg, #7C5CFF 0%, #1a173e 25%, #0c0b11 50%, #2a1a5e 75%, #7C5CFF 100%)', backgroundSize: '200% 200%' }} />
+      </div>
 
       <Titlebar />
       <div className="absolute left-0 top-0 h-screen pt-[38px] z-10">
