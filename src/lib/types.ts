@@ -21,13 +21,13 @@ export interface Episode { num: number; title: string; streams: StrSrc[] }
 export interface Anime {
   id: string; title: string; poster: string; banner: string; year: number
   status: string; eps: number; rating: number; synopsis: string
-  genres: string[]; tags: string[]; streams: StrSrc[]; vmode: VMode
+  genres: string[]; tags: string[]; streams: StrSrc[]; vmode: VMode; season?: string
 }
 
 export interface Hentai {
   id: string; title: string; poster: string; banner: string; year: number
   status: string; eps: number; rating: number; synopsis: string
-  genres: string[]; tags: string[]; streams: StrSrc[]; vmode: VMode; censored: boolean
+  genres: string[]; tags: string[]; streams: StrSrc[]; vmode: VMode; censored: boolean; season?: string
 }
 
 export interface Game {

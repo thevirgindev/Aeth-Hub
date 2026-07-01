@@ -72,24 +72,26 @@ export function DetailPage() {
           setSeries(s); setDetailTitle(s.title)
         } else if (detailType === 'anime') {
           const t = d.title || {}
+          const season = d.season || ''
           const a: typeof anime = {
             id: detailId, title: t.english || t.romaji || 'Unknown',
             poster: d.coverImage?.large || '', banner: d.bannerImage || '',
             year: d.seasonYear || 0, status: d.status || '', eps: d.episodes || 0,
             rating: (d.averageScore || 0) / 10, synopsis: d.description || '',
             genres: d.genres || [], tags: (d.tags || []).map((t: any) => t.name),
-            streams: [], vmode: 'sub' as any,
+            streams: [], vmode: 'sub' as any, season: season,
           }
           setAnime(a); setDetailTitle(a.title)
         } else if (detailType === 'manga') {
           const t = d.title || {}
+          const season = d.season || ''
           const a: typeof anime = {
             id: detailId, title: t.english || t.romaji || 'Unknown',
             poster: d.coverImage?.large || '', banner: d.bannerImage || '',
             year: d.seasonYear || 0, status: d.status || '', eps: d.chapters || d.episodes || 0,
             rating: (d.averageScore || 0) / 10, synopsis: d.description || '',
             genres: d.genres || [], tags: (d.tags || []).map((t: any) => t.name),
-            streams: [], vmode: 'sub' as any,
+            streams: [], vmode: 'sub' as any, season: season,
           }
           setAnime(a); setDetailTitle(a.title)
         } else if (detailType === 'game') {
@@ -241,24 +243,26 @@ export function DetailPage() {
           <div className="flex-1 min-w-0 pt-10">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <Badge variant="accent">{typeLabels[detailType] || detailType}</Badge>
-              {tags.slice(0, 3).map(t => <Badge key={t} variant="accent">{t}</Badge>)}
             </div>
             <h1 className="text-2xl font-extrabold text-text">{title}</h1>
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-dim">
-              {rating > 0 && <span className="text-[#FFD700] flex items-center gap-1"><Star size={14} fill="#FFD700" /> {rating.toFixed(1)}</span>}
-              {year && <span>{year}</span>}
-              {movie?.runtime && <span>{movie.runtime}m</span>}
-              {anime?.status && <span>{anime.status}</span>}
-              {hentai?.status && <span>{hentai.status}</span>}
-              {series?.seasons && <span>{series.seasons.length} seasons</span>}
-              {anime?.eps && <span>{anime.eps} episodes</span>}
-              {hentai?.eps && <span>{hentai.eps} episodes</span>}
-              {hentai?.censored !== undefined && <span className="text-error text-[11px]">{hentai.censored ? 'CENSORED' : 'UNCENSORED'}</span>}
-              {genres.filter(Boolean).slice(0, 4).map(g => (
-                <span key={g} className="bg-white/10 px-2 py-0.5 rounded text-[11px]">{g}</span>
-              ))}
+
+            <div className="mt-3 space-y-1.5">
+              {rating > 0 && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Rating:</span> <span className="text-[#FFD700]">{rating.toFixed(1)}</span></p>}
+              {year && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Year:</span> {year}</p>}
+              {anime?.season && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Season:</span> {anime.season}</p>}
+              {hentai?.season && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Season:</span> {hentai.season}</p>}
+              {movie?.runtime && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Runtime:</span> {movie.runtime}m</p>}
+              {series?.seasons && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Seasons:</span> {series.seasons.length}</p>}
+              {anime?.status && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Status:</span> {anime.status}</p>}
+              {hentai?.status && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Status:</span> {hentai.status}</p>}
+              {anime?.eps && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Episodes:</span> {anime.eps}</p>}
+              {hentai?.eps && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Episodes:</span> {hentai.eps}</p>}
+              {hentai?.censored !== undefined && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Content:</span> <span className="text-[11px] text-error">{hentai.censored ? 'CENSORED' : 'UNCENSORED'}</span></p>}
+              {genres.filter(Boolean).length > 0 && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Genre:</span> {genres.filter(Boolean).join(', ')}</p>}
+              {tags.length > 0 && <p className="text-xs text-dim"><span className="text-muted/50 font-medium">Tags:</span> {tags.join(', ')}</p>}
             </div>
-            <p className="mt-3 text-sm text-dim/80 leading-relaxed max-w-2xl">{overview || '—'}</p>
+
+            <p className="mt-4 text-sm text-dim/80 leading-relaxed max-w-2xl">{overview || '—'}</p>
             {game && (
               <div className="mt-3 flex items-center gap-3 text-sm text-dim flex-wrap">
                 <Badge variant="accent">{game.repacker}</Badge>
