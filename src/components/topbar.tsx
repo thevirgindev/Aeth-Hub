@@ -1,24 +1,18 @@
 import { useStore } from '../lib/store'
-import { Search } from 'lucide-react'
 
 export function Topbar() {
-  const { page, setSearchOpen } = useStore()
+  const { page } = useStore()
   const titles: Record<string, string> = {
     home: 'Home', movies: 'Movies', tvshows: 'TV Shows', kdramas: 'K-Dramas',
-    anime: 'Anime', hentai: 'Hentai', games: 'Games',
-    downloads: 'Downloads', settings: 'Settings', detail: '',
+    anime: 'Anime', games: 'Games',
+    downloads: 'Downloads', settings: 'Settings', addons: 'Addons', detail: '',
+    watchtogether: 'Watch Together', watchlist: 'Watchlist', themes: 'Themes',
   }
   return (
-    <header className="flex items-center justify-between h-14 px-6 border-b border-border shrink-0 bg-deep/80 backdrop-blur-[12px] z-40">
-      <h1 className="text-xl font-bold text-text">{titles[page] || ''}</h1>
-      <button
-        onClick={() => setSearchOpen(true)}
-        className="glass glass-hover rounded-xl px-4 py-2 text-sm text-dim flex items-center gap-2 cursor-pointer"
-      >
-        <Search size={16} />
-        <span>Search...</span>
-        <kbd className="text-muted text-[11px] ml-4 border border-border rounded px-1.5 py-0.5">⌘K</kbd>
-      </button>
+    <header className="relative flex items-center justify-between h-14 px-6 shrink-0 z-40 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-deep/95 via-deep/80 to-deep/95 backdrop-blur-[16px] border-b border-border/80" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,92,255,0.06),transparent_70%)] pointer-events-none" />
+      <h1 className="relative text-xl font-bold text-text tracking-tight z-10">{titles[page] || ''}</h1>
     </header>
   )
 }

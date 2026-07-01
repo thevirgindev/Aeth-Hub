@@ -53,17 +53,6 @@ pub struct PlaybackRow {
     pub position_secs: i64, pub duration_secs: i64, pub updated_at: i64,
 }
 
-pub async fn get_playback(pool: &SqlitePool, id: &str) -> Option<PlaybackRow> {
-    let row = sqlx::query(
-        "SELECT content_id, title, mtype, season, episode, position_secs, duration_secs, updated_at FROM playback_history WHERE content_id = ?"
-    ).bind(id).fetch_optional(pool).await.ok()?;
-    row.map(|r| PlaybackRow {
-        content_id: r.get(0), title: r.get(1), mtype: r.get(2),
-        season: r.get(3), episode: r.get(4), position_secs: r.get(5),
-        duration_secs: r.get(6), updated_at: r.get(7),
-    })
-}
-
 pub async fn get_all_playback(pool: &SqlitePool) -> Vec<PlaybackRow> {
     let rows = sqlx::query(
         "SELECT content_id, title, mtype, season, episode, position_secs, duration_secs, updated_at FROM playback_history ORDER BY updated_at DESC LIMIT 20"
@@ -119,6 +108,39 @@ pub async fn save_setting(pool: &SqlitePool, key: &str, value: &str) {
 
 pub async fn clear_scraper_cache(pool: &SqlitePool) {
     sqlx::query("DELETE FROM scraper_cache").execute(pool).await.unwrap();
+}
+
+pub struct DlRow {
+    pub id: String, pub title: String, pub url: String, pub magnet: String,
+    pub path: String, pub bytes_done: i64, pub bytes_total: i64, pub status: String, pub created_at: i64,
+}
+
+pub async fn add_download(pool: &SqlitePool, id: &str, title: &str, url: &str, magnet: &str, path: &str, bytes_total: i64) {
+    let now = chrono::Utc::now().timestamp();
+    sqlx::query(
+        "INSERT OR IGNORE INTO download_queue (id, title, url, magnet, path, bytes_done, bytes_total, status, created_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?, 'queued', ?)"
+    ).bind(id).bind(title).bind(url).bind(magnet).bind(path).bind(bytes_total).bind(now)
+    .execute(pool).await.unwrap();
+}
+
+pub async fn get_downloads(pool: &SqlitePool) -> Vec<DlRow> {
+    let rows = sqlx::query("SELECT id, title, url, magnet, path, bytes_done, bytes_total, status, created_at FROM download_queue ORDER BY created_at DESC")
+        .fetch_all(pool).await.unwrap_or_default();
+    rows.into_iter().map(|r| DlRow {
+        id: r.get(0), title: r.get(1), url: r.get(2), magnet: r.get(3),
+        path: r.get(4), bytes_done: r.get(5), bytes_total: r.get(6),
+        status: r.get(7), created_at: r.get(8),
+    }).collect()
+}
+
+pub async fn remove_download(pool: &SqlitePool, id: &str) {
+    sqlx::query("DELETE FROM download_queue WHERE id = ?").bind(id).execute(pool).await.unwrap();
+}
+
+pub async fn update_download_status(pool: &SqlitePool, id: &str, status: &str, bytes_done: i64) {
+    sqlx::query("UPDATE download_queue SET status = ?, bytes_done = ? WHERE id = ?")
+        .bind(status).bind(bytes_done).bind(id).execute(pool).await.unwrap();
 }
 
 pub async fn get_cached(pool: &SqlitePool, key: &str) -> Option<String> {

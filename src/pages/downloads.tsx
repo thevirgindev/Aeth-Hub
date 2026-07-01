@@ -24,7 +24,7 @@ export function DownloadsPage() {
   }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade">
+    <div className="flex-1 p-6 animate-fade">
       <p className="text-sm text-dim mb-4">{items.length} download{items.length !== 1 ? 's' : ''}</p>
       {items.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 text-muted">

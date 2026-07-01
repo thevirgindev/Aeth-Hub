@@ -24,18 +24,26 @@ export function HeroBanner({ items, onPlay, onDetail, renderMeta }: Props) {
     return () => clearInterval(t)
   }, [items.length])
 
-  if (!item) return <div className="w-full h-[45vh] min-h-[400px] max-h-[520px] rounded-2xl mb-6 skeleton-pulse" />
+  if (!item) return <div className="w-full h-[55vh] min-h-[420px] max-h-[600px] skeleton-pulse" />
 
   return (
-    <div className="relative w-full h-[45vh] min-h-[400px] max-h-[520px] overflow-hidden rounded-2xl mb-6">
+    <div className="relative w-full h-[55vh] min-h-[420px] max-h-[600px] overflow-hidden">
       {items.map((it, i) => (
-        <img
-          key={it.id}
-          src={it.backdrop}
-          alt=""
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[600ms] ease-in-out ${i === idx ? 'opacity-100' : 'opacity-0'}`}
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-        />
+        it.backdrop ? (
+          <div
+            key={it.id}
+            className={`absolute inset-0 w-full h-full transition-opacity duration-[600ms] ease-in-out ${i === idx ? 'opacity-100' : 'opacity-0'}`}>
+            <img
+              src={it.backdrop}
+              alt=""
+              className="w-full h-full object-cover scale-110 blur-sm brightness-50"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          </div>
+        ) : (
+          <div key={it.id}
+            className={`absolute inset-0 w-full h-full transition-opacity duration-[600ms] ease-in-out ${i === idx ? 'opacity-100' : 'opacity-0'} bg-gradient-to-br from-accent/20 via-deep to-[#1a173e]`} />
+        )
       ))}
       <div className="absolute inset-0 bg-gradient-to-t from-deep via-deep/60 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-deep via-deep/40 to-transparent" />

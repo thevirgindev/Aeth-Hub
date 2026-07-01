@@ -1,10 +1,33 @@
-use crate::models::StrSrc;
+use crate::models::*;
+use crate::db;
 use reqwest::Client;
 use scraper::{Html, Selector};
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::time::Duration;
 
-const TIMEOUT: Duration = Duration::from_secs(8);
+const TIMEOUT: Duration = Duration::from_secs(30);
+
+const USER_AGENTS: &[&str] = &[
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+];
+
+fn pick_ua() -> &'static str {
+    let i = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as usize % USER_AGENTS.len();
+    USER_AGENTS[i]
+}
 
 fn ih(magnet: &str) -> String {
     if let Some(start) = magnet.find("btih:") {
@@ -14,16 +37,6 @@ fn ih(magnet: &str) -> String {
     } else {
         String::new()
     }
-}
-
-fn size_bytes(s: &str) -> i64 {
-    let s = s.trim().to_lowercase();
-    let n: f64 = s.split_whitespace().next().unwrap_or("0").parse().unwrap_or(0.0);
-    if s.contains("tb") { (n * 1_099_511_627_776.0) as i64 }
-    else if s.contains("gb") { (n * 1_073_741_824.0) as i64 }
-    else if s.contains("mb") { (n * 1_048_576.0) as i64 }
-    else if s.contains("kb") { (n * 1024.0) as i64 }
-    else { n as i64 }
 }
 
 fn extract_quality(title: &str) -> String {
@@ -36,11 +49,19 @@ fn extract_quality(title: &str) -> String {
 }
 
 async fn get(client: &Client, url: &str) -> Result<String, String> {
-    client.get(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    let resp = client.get(url)
+        .header("User-Agent", pick_ua())
         .timeout(TIMEOUT)
-        .send().await.map_err(|e| e.to_string())?
-        .text().await.map_err(|e| e.to_string())
+        .send().await;
+    let resp = match resp {
+        Ok(r) => r,
+        Err(e) => { eprintln!("[scraper] request failed: {} — {}", url, e); return Err(e.to_string()) }
+    };
+    let text = resp.text().await;
+    match text {
+        Ok(t) => Ok(t),
+        Err(e) => { eprintln!("[scraper] body read failed: {} — {}", url, e); Err(e.to_string()) }
+    }
 }
 
 struct RowInfo {
@@ -74,6 +95,7 @@ pub async fn search_1337x(client: &Client, query: &str, cat: &str) -> Vec<StrSrc
 
             if let Some(link) = link_el {
                 let title = link.text().collect::<String>().trim().to_string();
+                if title.is_empty() || title.len() < 3 { continue; }
                 let href = link.value().attr("href").unwrap_or("").to_string();
                 rows.push(RowInfo { title, href, seeds, size });
             }
@@ -112,30 +134,26 @@ pub async fn search_tpb(client: &Client, query: &str, cat: &str) -> Vec<StrSrc> 
         };
         let doc = Html::parse_document(&html);
         let row_sel = Selector::parse("#searchResult tr").unwrap();
-        let name_sel = Selector::parse(".detName a").unwrap();
+        let name_sel = Selector::parse(".detName a, .item-name a, a[href^='/torrent/']").unwrap();
         let magnet_sel = Selector::parse("a[href^='magnet:']").unwrap();
         let seeds_sel = Selector::parse("td:nth-child(3)").unwrap();
-        let size_sel = Selector::parse("font.detDesc").unwrap();
 
         for row in doc.select(&row_sel).take(15) {
             let title = row.select(&name_sel).next()
                 .map(|e| e.text().collect::<String>().trim().to_string()).unwrap_or_default();
+            if title.is_empty() || title.len() < 3 { continue; }
             let seeds: i32 = row.select(&seeds_sel).next()
                 .and_then(|e| e.text().next())
                 .and_then(|s| s.trim().parse().ok()).unwrap_or(0);
             let magnet = row.select(&magnet_sel).next()
                 .and_then(|e| e.value().attr("href")).unwrap_or("").to_string();
-            let size_text = row.select(&size_sel).next()
-                .map(|e| e.text().collect::<String>()).unwrap_or_default();
-            let size = size_text.split(',').nth(1).unwrap_or("").trim().to_string();
+            if magnet.is_empty() { continue; }
 
-            if !magnet.is_empty() {
-                let quality = extract_quality(&title);
-                results.push(StrSrc {
-                    name: title, url: magnet.clone(), quality,
-                    size, seeders: seeds, kind: cat.to_string(), info_hash: ih(&magnet),
-                });
-            }
+            let quality = extract_quality(&title);
+            results.push(StrSrc {
+                name: title, url: magnet.clone(), quality,
+                size: String::new(), seeders: seeds, kind: cat.to_string(), info_hash: ih(&magnet),
+            });
         }
         if !results.is_empty() { break; }
     }
@@ -204,7 +222,7 @@ pub async fn search_nyaa(client: &Client, query: &str, cat: &str) -> Vec<StrSrc>
             name: title, url: magnet, quality,
             size, seeders: seeds, kind: cat.to_string(), info_hash,
         }
-    }).filter(|s| !s.url.is_empty()).collect()
+    }).filter(|s| !s.url.is_empty() && !s.name.is_empty() && s.name.len() >= 3).collect()
 }
 
 pub async fn search_eztv(client: &Client, query: &str) -> Vec<StrSrc> {
@@ -231,7 +249,7 @@ pub async fn search_eztv(client: &Client, query: &str) -> Vec<StrSrc> {
             name: title, url: magnet, quality,
             size, seeders: 0, kind: "TV".into(), info_hash,
         }
-    }).filter(|s| !s.url.is_empty()).collect()
+    }).filter(|s| !s.url.is_empty() && !s.name.is_empty() && s.name.len() >= 3).collect()
 }
 
 pub async fn search_anidex(client: &Client, query: &str) -> Vec<StrSrc> {
@@ -259,7 +277,7 @@ pub async fn search_anidex(client: &Client, query: &str) -> Vec<StrSrc> {
             name: title, url: magnet, quality,
             size: String::new(), seeders: seeds, kind: "Anime".into(), info_hash,
         }
-    }).filter(|s| !s.url.is_empty()).collect()
+    }).filter(|s| !s.url.is_empty() && !s.name.is_empty() && s.name.len() >= 3).collect()
 }
 
 async fn scrape_repack_site(client: &Client, url: &str, repacker: &str) -> Vec<StrSrc> {
@@ -378,10 +396,30 @@ pub async fn search_onlinefix(client: &Client, query: &str) -> Vec<StrSrc> {
     }).filter(|s| !s.name.is_empty()).collect()
 }
 
+async fn delay_between_scrapes() {
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_micros() as u64;
+    let secs = 5 + (seed % 11);
+    tokio::time::sleep(Duration::from_secs(secs)).await;
+}
+
+pub async fn search_ovagames(client: &Client, query: &str) -> Vec<StrSrc> {
+    let encoded: String = urlencoding(&query);
+    scrape_repack_site(client, &format!("https://ovagames.com/?s={}", encoded), "OvaGames").await
+}
+
+pub async fn search_xgameszone(client: &Client, query: &str) -> Vec<StrSrc> {
+    let encoded: String = urlencoding(&query);
+    scrape_repack_site(client, &format!("https://xgames.zone/?s={}", encoded), "XGamesZone").await
+}
+
 fn dedup_sorted(mut results: Vec<StrSrc>) -> Vec<StrSrc> {
     let mut seen = HashMap::new();
     let mut deduped = Vec::new();
     for s in results.drain(..) {
+        if s.name.is_empty() || s.name.len() < 3 { continue; }
         let key = if s.info_hash.is_empty() { s.name.clone() } else { s.info_hash.clone() };
         let entry = seen.entry(key).or_insert(StrSrc { seeders: -1, ..s.clone() });
         if s.seeders > entry.seeders { *entry = s; }
@@ -402,74 +440,308 @@ macro_rules! join_search {
     }};
 }
 
-pub async fn search_movies(client: &Client, query: &str) -> Vec<StrSrc> {
-    dedup_sorted(join_search!(
-        client,
-        search_1337x(client, query, "Movies"),
-        search_tpb(client, query, "200"),
-        search_yts(client, query),
-    ))
+async fn cached_search(
+    pool: &SqlitePool,
+    cache_key: &str,
+    ttl_secs: i64,
+    f: impl std::future::Future<Output = Vec<StrSrc>>,
+) -> Vec<StrSrc> {
+    if let Some(cached) = db::get_cached(pool, cache_key).await {
+        if let Ok(results) = serde_json::from_str::<Vec<StrSrc>>(&cached) {
+            return results;
+        }
+    }
+    let results = f.await;
+    if let Ok(json) = serde_json::to_string(&results) {
+        db::set_cached(pool, cache_key, &json, ttl_secs).await;
+    }
+    results
 }
 
-pub async fn search_tv(client: &Client, query: &str) -> Vec<StrSrc> {
-    dedup_sorted(join_search!(
-        client,
-        search_1337x(client, query, "TV"),
-        search_tpb(client, query, "205"),
-        search_eztv(client, query),
-    ))
+pub async fn search_movies(client: &Client, pool: &SqlitePool, query: &str) -> Vec<StrSrc> {
+    let cache_key = format!("search_movies:{}", query.to_lowercase());
+    cached_search(pool, &cache_key, 2592000, async move {
+        dedup_sorted(join_search!(
+            client,
+            search_1337x(client, query, "Movies"),
+            search_tpb(client, query, "200"),
+            search_yts(client, query),
+        ))
+    }).await
 }
 
-pub async fn search_anime(client: &Client, query: &str) -> Vec<StrSrc> {
-    dedup_sorted(join_search!(
-        client,
-        search_nyaa(client, query, "Anime"),
-        search_anidex(client, query),
-        search_1337x(client, query, "Anime"),
-    ))
+pub async fn search_tv(client: &Client, pool: &SqlitePool, query: &str) -> Vec<StrSrc> {
+    let cache_key = format!("search_tv:{}", query.to_lowercase());
+    cached_search(pool, &cache_key, 2592000, async move {
+        dedup_sorted(join_search!(
+            client,
+            search_1337x(client, query, "TV"),
+            search_tpb(client, query, "205"),
+            search_eztv(client, query),
+        ))
+    }).await
 }
 
-pub async fn search_hentai(client: &Client, query: &str) -> Vec<StrSrc> {
-    dedup_sorted(join_search!(
-        client,
-        search_nyaa(client, query, "Hentai"),
-        search_1337x(client, query, "XXX"),
-    ))
+pub async fn search_anime(client: &Client, pool: &SqlitePool, query: &str) -> Vec<StrSrc> {
+    let cache_key = format!("search_anime:{}", query.to_lowercase());
+    cached_search(pool, &cache_key, 2592000, async move {
+        dedup_sorted(join_search!(
+            client,
+            search_nyaa(client, query, "Anime"),
+            search_anidex(client, query),
+            search_1337x(client, query, "Anime"),
+        ))
+    }).await
 }
 
-pub async fn search_games(client: &Client, query: &str) -> Vec<StrSrc> {
-    dedup_sorted(join_search!(
-        client,
-        search_fitgirl(client, query),
-        search_dodi(client, query),
-        search_steamrip(client, query),
-        search_gog(client, query),
-        search_onlinefix(client, query),
-        search_1337x(client, query, "Games"),
-        search_tpb(client, query, "300"),
-    ))
+pub async fn search_hentai(client: &Client, pool: &SqlitePool, query: &str) -> Vec<StrSrc> {
+    let cache_key = format!("search_hentai:{}", query.to_lowercase());
+    cached_search(pool, &cache_key, 2592000, async move {
+        dedup_sorted(join_search!(
+            client,
+            search_nyaa(client, query, "Hentai"),
+            search_1337x(client, query, "XXX"),
+        ))
+    }).await
 }
 
-pub async fn search_all(client: &Client, query: &str) -> Vec<StrSrc> {
-    let movies = search_movies(client, query);
-    let tv = search_tv(client, query);
-    let anime = search_anime(client, query);
-    let hentai = search_hentai(client, query);
-    let games = search_games(client, query);
+pub async fn search_games(client: &Client, pool: &SqlitePool, query: &str) -> Vec<StrSrc> {
+    let cache_key = format!("search_games:{}", query.to_lowercase());
+    cached_search(pool, &cache_key, 2592000, async move {
+        let mut all = Vec::new();
+        all.extend(search_fitgirl(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_dodi(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_steamrip(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_gog(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_onlinefix(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_ovagames(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_xgameszone(client, query).await);
+        delay_between_scrapes().await;
+        all.extend(search_1337x(client, query, "Games").await);
+        delay_between_scrapes().await;
+        all.extend(search_tpb(client, query, "300").await);
+        dedup_sorted(all)
+    }).await
+}
 
-    let movies = movies.await;
-    let tv = tv.await;
-    let anime = anime.await;
-    let hentai = hentai.await;
-    let games = games.await;
+pub async fn search_all(client: &Client, pool: &SqlitePool, query: &str) -> Vec<StrSrc> {
+    let cache_key = format!("search_all:{}", query.to_lowercase());
+    cached_search(pool, &cache_key, 2592000, async move {
+        let movies = search_movies(client, pool, query);
+        let tv = search_tv(client, pool, query);
+        let anime = search_anime(client, pool, query);
+        let hentai = search_hentai(client, pool, query);
+        let games = search_games(client, pool, query);
 
-    let mut all = Vec::new();
-    all.extend(movies);
-    all.extend(tv);
-    all.extend(anime);
-    all.extend(hentai);
-    all.extend(games);
-    dedup_sorted(all)
+        let mut all = Vec::new();
+        all.extend(movies.await);
+        all.extend(tv.await);
+        all.extend(anime.await);
+        all.extend(hentai.await);
+        all.extend(games.await);
+        dedup_sorted(all)
+    }).await
+}
+
+pub async fn fetch_movie_catalog(client: &Client, pool: &SqlitePool) -> Vec<Movie> {
+    let cache_key = "catalog:movies";
+    if let Some(cached) = db::get_cached(pool, cache_key).await {
+        if let Ok(results) = serde_json::from_str::<Vec<Movie>>(&cached) {
+            return results;
+        }
+    }
+    let json = match get(client, "https://yts.mx/api/v2/list_movies.json?limit=50&sort=download_count&order_by=desc").await {
+        Ok(j) => j, Err(_) => return vec![]
+    };
+    let v: serde_json::Value = match serde_json::from_str(&json) { Ok(j) => j, Err(_) => return vec![] };
+    let movies = v["data"]["movies"].as_array().map(|a| a.clone()).unwrap_or_default();
+
+    let results: Vec<Movie> = movies.iter().enumerate().map(|(i, m)| {
+        let genres: Vec<String> = m["genres"].as_array()
+            .map(|a| a.iter().filter_map(|g| g.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        Movie {
+            id: format!("ym{}", m["id"].as_i64().unwrap_or(i as i64)),
+            title: m["title"].as_str().unwrap_or("").to_string(),
+            poster: m["medium_cover_image"].as_str().unwrap_or("").to_string(),
+            backdrop: m["background_image"].as_str().unwrap_or("").to_string(),
+            year: m["year"].as_i64().unwrap_or(0) as i32,
+            rating: m["rating"].as_f64().unwrap_or(0.0).min(10.0) as f32,
+            runtime: m["runtime"].as_i64().unwrap_or(0) as i32,
+            overview: m["summary"].as_str().unwrap_or("").to_string(),
+            genres,
+            tags: vec![],
+            streams: vec![],
+        }
+    }).collect();
+
+    if let Ok(json) = serde_json::to_string(&results) {
+        db::set_cached(pool, cache_key, &json, 7200).await;
+    }
+    results
+}
+
+pub async fn fetch_anime_catalog(client: &Client, pool: &SqlitePool) -> Vec<Anime> {
+    let cache_key = "catalog:anime";
+    if let Some(cached) = db::get_cached(pool, cache_key).await {
+        if let Ok(results) = serde_json::from_str::<Vec<Anime>>(&cached) {
+            return results;
+        }
+    }
+    let json = match get(client, "https://api.jikan.moe/v4/top/anime?limit=25&filter=bypopularity").await {
+        Ok(j) => j, Err(_) => return vec![]
+    };
+    let v: serde_json::Value = match serde_json::from_str(&json) { Ok(j) => j, Err(_) => return vec![] };
+    let list = v["data"].as_array().map(|a| a.clone()).unwrap_or_default();
+
+    let results: Vec<Anime> = list.iter().enumerate().map(|(i, entry)| {
+        let genres: Vec<String> = entry["genres"].as_array()
+            .map(|a| a.iter().filter_map(|g| g["name"].as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        Anime {
+            id: format!("aj{}", entry["mal_id"].as_i64().unwrap_or(i as i64)),
+            title: entry["title"].as_str().unwrap_or("").to_string(),
+            poster: entry["images"]["jpg"]["image_url"].as_str().unwrap_or("").to_string(),
+            banner: entry["images"]["jpg"]["large_image_url"].as_str().unwrap_or("").to_string(),
+            year: entry["year"].as_i64().or_else(|| entry["aired"]["prop"]["from"]["year"].as_i64()).unwrap_or(0) as i32,
+            status: entry["status"].as_str().unwrap_or("").to_string(),
+            eps: entry["episodes"].as_i64().unwrap_or(0) as i32,
+            rating: entry["score"].as_f64().unwrap_or(0.0).min(10.0) as f32,
+            synopsis: entry["synopsis"].as_str().unwrap_or("").to_string(),
+            genres,
+            tags: vec![],
+            streams: vec![],
+            vmode: VMode::Sub,
+        }
+    }).collect();
+
+    if let Ok(json) = serde_json::to_string(&results) {
+        db::set_cached(pool, cache_key, &json, 7200).await;
+    }
+    results
+}
+
+pub async fn fetch_series_catalog(client: &Client, pool: &SqlitePool) -> Vec<Series> {
+    let cache_key = "catalog:series";
+    if let Some(cached) = db::get_cached(pool, cache_key).await {
+        if let Ok(results) = serde_json::from_str::<Vec<Series>>(&cached) {
+            return results;
+        }
+    }
+    let json = match get(client, "https://api.tvmaze.com/shows?page=0").await {
+        Ok(j) => j, Err(_) => return vec![]
+    };
+    let v: Vec<serde_json::Value> = match serde_json::from_str(&json) { Ok(j) => j, Err(_) => return vec![] };
+    let results: Vec<Series> = v.iter().take(25).enumerate().map(|(i, s)| {
+        let genres: Vec<String> = s["genres"].as_array()
+            .map(|a| a.iter().filter_map(|g| g.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        let is_kdrama = genres.iter().any(|g| g == "Romance" || g == "Drama") &&
+            s["network"]["country"]["name"].as_str().map(|n| n == "South Korea").unwrap_or(false);
+        let img = s["image"]["original"].as_str().or_else(|| s["image"]["medium"].as_str()).unwrap_or("").to_string();
+        Series {
+            id: format!("tv{}", s["id"].as_i64().unwrap_or(i as i64)),
+            title: s["name"].as_str().unwrap_or("").to_string(),
+            poster: img.clone(),
+            backdrop: s["image"]["medium"].as_str().unwrap_or("").to_string(),
+            year: s["premiered"].as_str().and_then(|d| d[..4].parse().ok()).unwrap_or(0),
+            rating: s["rating"]["average"].as_f64().unwrap_or(0.0).min(10.0) as f32,
+            overview: s["summary"].as_str().map(|h| {
+                h.replace("<p>", "").replace("</p>", "\n").replace("<b>", "").replace("</b>", "")
+            }).unwrap_or_default().trim().to_string(),
+            genres, tags: vec![],
+            is_kdrama,
+            seasons: vec![],
+        }
+    }).collect();
+
+    if let Ok(json) = serde_json::to_string(&results) {
+        db::set_cached(pool, cache_key, &json, 7200).await;
+    }
+    results
+}
+
+pub async fn fetch_game_catalog(client: &Client, pool: &SqlitePool) -> Vec<Game> {
+    let cache_key = "catalog:games";
+    if let Some(cached) = db::get_cached(pool, cache_key).await {
+        if let Ok(results) = serde_json::from_str::<Vec<Game>>(&cached) {
+            return results;
+        }
+    }
+    let json = match get(client, "https://www.freetogame.com/api/games?sort-by=release-date").await {
+        Ok(j) => j, Err(_) => return vec![]
+    };
+    let v: Vec<serde_json::Value> = match serde_json::from_str(&json) { Ok(j) => j, Err(_) => return vec![] };
+    let results: Vec<Game> = v.iter().enumerate().map(|(i, g)| {
+        let genre = g["genre"].as_str().unwrap_or("").to_string();
+        Game {
+            id: format!("fg{}", g["id"].as_i64().unwrap_or(i as i64)),
+            title: g["title"].as_str().unwrap_or("").to_string(),
+            icon: g["thumbnail"].as_str().unwrap_or("").to_string(),
+            banner: g["thumbnail"].as_str().map(|t| t.replace("/thumbnail.jpg", "/background.jpg")).unwrap_or_default(),
+            genre,
+            desc: g["short_description"].as_str().unwrap_or("").to_string(),
+            size: String::new(),
+            repacker: String::new(),
+            url: g["game_url"].as_str().unwrap_or("").to_string(),
+            dl_count: g["freetogame_profile_url"].as_str().map(|_| g["id"].as_i64().unwrap_or(i as i64) as i32).unwrap_or(0),
+            rating: 0.0,
+            tags: vec![],
+            screenshots: vec![],
+        }
+    }).collect();
+
+    if let Ok(json) = serde_json::to_string(&results) {
+        db::set_cached(pool, cache_key, &json, 7200).await;
+    }
+    results
+}
+
+pub async fn fetch_hentai_catalog(client: &Client, pool: &SqlitePool) -> Vec<Hentai> {
+    let cache_key = "catalog:hentai";
+    if let Some(cached) = db::get_cached(pool, cache_key).await {
+        if let Ok(results) = serde_json::from_str::<Vec<Hentai>>(&cached) {
+            return results;
+        }
+    }
+    let json = match get(client, "https://api.jikan.moe/v4/anime?genres=12&order_by=popularity&limit=25&sfw=false").await {
+        Ok(j) => j, Err(_) => return vec![]
+    };
+    let v: serde_json::Value = match serde_json::from_str(&json) { Ok(j) => j, Err(_) => return vec![] };
+    let list = v["data"].as_array().map(|a| a.clone()).unwrap_or_default();
+
+    let results: Vec<Hentai> = list.iter().enumerate().map(|(i, entry)| {
+        let genres: Vec<String> = entry["genres"].as_array()
+            .map(|a| a.iter().filter_map(|g| g["name"].as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        Hentai {
+            id: format!("hj{}", entry["mal_id"].as_i64().unwrap_or(i as i64)),
+            title: entry["title"].as_str().unwrap_or("").to_string(),
+            poster: entry["images"]["jpg"]["image_url"].as_str().unwrap_or("").to_string(),
+            banner: entry["images"]["jpg"]["large_image_url"].as_str().unwrap_or("").to_string(),
+            year: entry["year"].as_i64().or_else(|| entry["aired"]["prop"]["from"]["year"].as_i64()).unwrap_or(0) as i32,
+            status: entry["status"].as_str().unwrap_or("").to_string(),
+            eps: entry["episodes"].as_i64().unwrap_or(0) as i32,
+            rating: entry["score"].as_f64().unwrap_or(0.0).min(10.0) as f32,
+            synopsis: entry["synopsis"].as_str().unwrap_or("").to_string(),
+            genres,
+            tags: vec![],
+            streams: vec![],
+            vmode: VMode::Sub,
+            censored: !entry["rating"].as_str().map(|r| r.contains("Rx")).unwrap_or(true),
+        }
+    }).collect();
+
+    if let Ok(json) = serde_json::to_string(&results) {
+        db::set_cached(pool, cache_key, &json, 7200).await;
+    }
+    results
 }
 
 fn urlencoding(s: &str) -> String {

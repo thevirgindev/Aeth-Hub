@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Movie, Series, Game, Anime, Hentai, StrSrc, SearchRes, DlItem, PlaybackPos, AppSettings } from './types'
+import { Store } from '@tauri-apps/plugin-store'
+import type { Movie, Series, Game, Anime, Hentai, StrSrc, DlItem, PlaybackPos, AppSettings, BrowseResult } from './types'
 
 export const getMovies = () => invoke<Movie[]>('get_movies')
 export const getSeries = () => invoke<Series[]>('get_series')
@@ -30,7 +31,89 @@ export const toggleFav = (id: string, mtype: string, title: string, poster: stri
   invoke<boolean>('toggle_fav', { id, mtype, title, poster })
 
 export const getDownloads = () => invoke<DlItem[]>('get_downloads')
+export const addDownload = (title: string, url: string, magnet: string, path: string, bytesTotal: number) =>
+  invoke<void>('add_download', { title, url, magnet, path, bytesTotal })
+export const removeDownload = (id: string) => invoke<void>('remove_download', { id })
+export const getDownloadsDb = () => invoke<DlItem[]>('get_downloads_db')
 
 export const getSettings = () => invoke<AppSettings>('get_settings')
 export const saveSettings = (settings: AppSettings) => invoke<void>('save_settings', { settings })
 export const clearCache = () => invoke<void>('clear_cache')
+
+export const discordConnect = (clientId: string) => invoke<void>('discord_connect', { clientId })
+export const discordUpdate = (stateText: string, details: string) =>
+  invoke<void>('discord_update', { stateText, details })
+export const discordDisconnect = () => invoke<void>('discord_disconnect')
+
+export const browseCatalog = (kind: string, genre: string, sort: string, offset: number, limit: number) =>
+  invoke<BrowseResult>('browse_catalog', { kind, genre, sort, offset, limit })
+
+export const searchCatalog = (q: string, kind: string, offset: number, limit: number) =>
+  invoke<BrowseResult>('search_catalog', { q, kind, offset, limit })
+
+export const streamMagnet = (magnet: string) => invoke<string>('stream_magnet', { magnet })
+export const stopStream = (id: string) => invoke<void>('stop_stream', { id })
+
+export const getApiDetail = (kind: string, id: string) => invoke<any>('get_api_detail', { kind, id })
+
+export const browseAnilist = (genre: string, sort: string, page: number, limit: number, mediaType: string = 'ANIME') =>
+  invoke<BrowseResult>('browse_anilist', { genre, sort, page, limit, mediaType })
+export const searchAnilist = (query: string, page: number, limit: number, mediaType: string = 'ANIME') =>
+  invoke<BrowseResult>('search_anilist', { query, page, limit, mediaType })
+
+export const browseSteam = (sort: string, page: number, limit: number) =>
+  invoke<BrowseResult>('browse_steam', { sort, page, limit })
+export const searchSteam = (query: string, page: number, limit: number) =>
+  invoke<BrowseResult>('search_steam', { query, page, limit })
+
+const ANILIST_CLIENT_ID = '20915'
+const ANILIST_REDIRECT_URI = 'aethhub://callback'
+
+export function getAnilistAuthUrl(): string {
+  return `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&redirect_uri=${encodeURIComponent(ANILIST_REDIRECT_URI)}&response_type=code`
+}
+
+export async function anilistExchangeCode(code: string): Promise<string> {
+  return invoke<string>('anilist_exchange', { code })
+}
+
+export async function anilistSync(token: string, mediaId: number, score: number, status: string, progress?: number): Promise<void> {
+  return invoke<void>('anilist_sync', { token, mediaId, score, status, progress: progress ?? null })
+}
+
+let _anilistStore: Awaited<ReturnType<typeof Store.load>> | null = null
+async function getStore() {
+  if (!_anilistStore) _anilistStore = await Store.load('anilist.json')
+  return _anilistStore
+}
+
+export async function getAnilistToken(): Promise<string | null> {
+  const s = await getStore()
+  return (await s.get<string>('token')) || null
+}
+
+export async function setAnilistToken(token: string): Promise<void> {
+  const s = await getStore()
+  await s.set('token', token)
+  await s.save()
+}
+
+export async function removeAnilistToken(): Promise<void> {
+  const s = await getStore()
+  await s.delete('token')
+  await s.save()
+}
+
+export async function searchOmdb(title: string, year?: string): Promise<any> {
+  return invoke<any>('search_omdb', { title, year: year || null })
+}
+
+export async function searchMovieDetail(imdbId: string): Promise<any> {
+  return invoke<any>('search_movie_detail', { imdbId })
+}
+
+export const getPcUsername = () => invoke<string>('get_pc_username')
+
+export async function proxyImage(url: string): Promise<string> {
+  return invoke<string>('proxy_image', { url })
+}

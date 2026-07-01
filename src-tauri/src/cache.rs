@@ -1,32 +1,29 @@
+use crate::models::BrowseResult;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::time::Instant;
 
-pub struct Cache {
-    store: Mutex<HashMap<String, CacheEntry>>,
+const TTL_SECS: u64 = 300;
+
+pub struct ApiCache {
+    map: HashMap<String, (Instant, BrowseResult)>,
 }
 
-struct CacheEntry {
-    data: String,
-    expires: i64,
-}
-
-impl Cache {
-    pub fn new() -> Self { Self { store: Mutex::new(HashMap::new()) } }
-
-    pub fn get(&self, key: &str) -> Option<String> {
-        let store = self.store.lock().unwrap();
-        let entry = store.get(key)?;
-        let now = chrono::Utc::now().timestamp();
-        if entry.expires > now {
-            Some(entry.data.clone())
-        } else {
-            None
-        }
+impl ApiCache {
+    pub fn new() -> Self {
+        Self { map: HashMap::new() }
     }
 
-    pub fn set(&self, key: &str, data: &str, ttl_secs: i64) {
-        let expires = chrono::Utc::now().timestamp() + ttl_secs;
-        let mut store = self.store.lock().unwrap();
-        store.insert(key.to_string(), CacheEntry { data: data.to_string(), expires });
+    pub fn get(&self, key: &str) -> Option<BrowseResult> {
+        self.map.get(key).and_then(|(t, r)| {
+            if t.elapsed().as_secs() < TTL_SECS {
+                Some(r.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn set(&mut self, key: String, result: BrowseResult) {
+        self.map.insert(key, (Instant::now(), result));
     }
 }

@@ -2,10 +2,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum MType { Movie, Series, Anime, Hentai, Game }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
 pub enum DlStat { Queued, Resolving, Downloading, Paused, Done, Failed }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -56,7 +52,8 @@ pub struct Hentai {
 pub struct Game {
     pub id: String, pub title: String, pub icon: String, pub banner: String,
     pub genre: String, pub desc: String, pub size: String, pub repacker: String,
-    pub url: String, pub dl_count: i32, pub tags: Vec<String>, pub screenshots: Vec<String>,
+    pub url: String, pub dl_count: i32, pub rating: f32,
+    pub tags: Vec<String>, pub screenshots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,12 +70,6 @@ pub struct StrSrc {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchRes {
-    pub id: String, pub title: String, pub poster: String, pub year: i32,
-    pub mtype: MType, pub rating: f32, pub source: String, pub quality: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaybackPos {
     pub content_id: String, pub title: String, pub mtype: String,
     pub season: Option<i32>, pub episode: Option<i32>,
@@ -86,7 +77,25 @@ pub struct PlaybackPos {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatalogItem {
+    pub id: String, pub title: String, pub poster: String,
+    pub year: i32, pub rating: f32, pub genres: Vec<String>,
+    pub kind: String, pub tags: Vec<String>,
+    pub genre: Option<String>, pub status: Option<String>,
+    pub eps: Option<i32>, pub icon: Option<String>,
+    pub size: Option<String>, pub repacker: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BrowseResult {
+    pub items: Vec<CatalogItem>,
+    pub total: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub use_custom_player: bool, pub download_path: String,
     pub scrapers_enabled: Vec<String>, pub accent_color: String,
+    pub show_hentai: bool, pub discord_client_id: String,
+    pub onboarded: bool, pub theme_mode: String,
 }

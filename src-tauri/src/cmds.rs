@@ -1,172 +1,422 @@
-use crate::cache::Cache;
+use crate::anilist;
+use crate::cache::ApiCache;
 use crate::db;
+use crate::discord::DiscordRpc;
 use crate::dl::DlMgr;
+use crate::imgproxy;
 use crate::models::*;
+use crate::omdb;
 use crate::player;
 use crate::scrapers::torrents;
+use crate::steam;
+use crate::streamer::Streamer;
+
 use reqwest::Client;
 use sqlx::SqlitePool;
 use std::sync::Mutex;
 use tauri::State;
 
+pub fn sanitize_error(e: &str) -> String {
+    e.replace(std::env::current_exe().unwrap_or_default().to_string_lossy().as_ref(), "[binary]")
+}
+
 pub struct AppState {
-    pub cache: Cache,
     pub dl: DlMgr,
-    pub favs: Mutex<Vec<String>>,
     pub db: SqlitePool,
     pub http: Client,
+    pub discord: Mutex<DiscordRpc>,
+    pub streamer: Streamer,
+    pub cache: Mutex<ApiCache>,
 }
 
-macro_rules! sample_movies { () => { vec![
-    Movie { id: "m1".into(), title: "Dune: Part Two".into(), poster: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/8uVKf2EhC6pMEGgVnVo1LDNQ4mk.jpg".into(), year: 2024, rating: 8.6, runtime: 166, overview: "Paul Atreides unites with the Fremen to seek revenge against those who destroyed his family.".into(), genres: vec!["Sci-Fi".into(), "Adventure".into()], tags: vec!["Trending".into(), "4K".into()], streams: vec![] },
-    Movie { id: "m2".into(), title: "The Batman".into(), poster: "https://image.tmdb.org/t/p/w500/74xTEgt7R36Fpooo50r9T25onhq.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/6MKr3KgOLmzOPWMSnR3BfZ7ZpT8.jpg".into(), year: 2022, rating: 7.8, runtime: 176, overview: "When a sadistic serial killer begins murdering key political figures in Gotham, Batman is forced to investigate the city's hidden corruption.".into(), genres: vec!["Action".into(), "Crime".into(), "Drama".into()], tags: vec!["New".into(), "4K".into()], streams: vec![] },
-    Movie { id: "m3".into(), title: "Interstellar".into(), poster: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/rAiYTfKGqDCRIIqo664sY9XZIvQ.jpg".into(), year: 2014, rating: 8.7, runtime: 169, overview: "When Earth becomes uninhabitable, a team of astronauts travel through a wormhole in search of a new home for humanity.".into(), genres: vec!["Sci-Fi".into(), "Drama".into()], tags: vec!["Top Rated".into()], streams: vec![] },
-    Movie { id: "m4".into(), title: "Blade Runner 2049".into(), poster: "https://image.tmdb.org/t/p/w500/gajva2L0rPYkyRjMt4HfN1c5tLc.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/9E5esxT0X3THMvJCC4nN1STyp6c.jpg".into(), year: 2017, rating: 8.0, runtime: 164, overview: "A young blade runner discovers a long-buried secret that leads him to track down former blade runner Rick Deckard.".into(), genres: vec!["Sci-Fi".into(), "Thriller".into()], tags: vec!["4K".into(), "HDR".into()], streams: vec![] },
-    Movie { id: "m5".into(), title: "John Wick: Chapter 4".into(), poster: "https://image.tmdb.org/t/p/w500/vZloFAK7NmvMGKE7VkF5UHaz0I.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/3V4kLQg0kSqPLct2aTSLehJQwTC.jpg".into(), year: 2023, rating: 7.8, runtime: 169, overview: "John Wick uncovers a path to defeating The High Table.".into(), genres: vec!["Action".into(), "Thriller".into()], tags: vec!["Trending".into()], streams: vec![] },
-    Movie { id: "m6".into(), title: "Everything Everywhere All at Once".into(), poster: "https://image.tmdb.org/t/p/w500/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/7fVDxpn4fU5RQ4P5zT03x6prRHM.jpg".into(), year: 2022, rating: 8.3, runtime: 139, overview: "An aging Chinese immigrant is swept up in an insane adventure where she alone can save the world by exploring other universes.".into(), genres: vec!["Action".into(), "Comedy".into(), "Sci-Fi".into()], tags: vec!["Top Rated".into()], streams: vec![] },
-] } }
 
-macro_rules! sample_series { () => { vec![
-    Series { id: "s1".into(), title: "Severance".into(), poster: "https://image.tmdb.org/t/p/w500/1ZkwHUSe80Lx20HmEkSkCxJACu.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/6Pw3vTLEbVLy4RTxIJbSCMSAMs.jpg".into(), year: 2022, rating: 8.7, overview: "Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives.".into(), genres: vec!["Sci-Fi".into(), "Drama".into(), "Thriller".into()], tags: vec!["Trending".into(), "4K".into()], is_kdrama: false, seasons: vec![Season { num: 1, episodes: vec![
-        Episode { num: 1, title: "Good News About Hell".into(), streams: vec![] },
-        Episode { num: 2, title: "Half Loop".into(), streams: vec![] },
-        Episode { num: 3, title: "In Perpetuity".into(), streams: vec![] },
-    ]}, Season { num: 2, episodes: vec![
-        Episode { num: 1, title: "Hello, Ms. Cobel".into(), streams: vec![] },
-        Episode { num: 2, title: "Goodbye, Mrs. Selvig".into(), streams: vec![] },
-    ]}] },
-    Series { id: "s2".into(), title: "The Last of Us".into(), poster: "https://image.tmdb.org/t/p/w500/uKvVjHNqB1VmM3s4FJ6KQn5CP6.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/b8Q6WBNn2iMpbNj2lQpOBr6ZJ2.jpg".into(), year: 2023, rating: 8.8, overview: "After a global pandemic destroys civilization, a hardened survivor takes charge of a 14-year-old girl who may be humanity's last hope.".into(), genres: vec!["Action".into(), "Drama".into(), "Horror".into()], tags: vec!["New".into(), "HDR".into()], is_kdrama: false, seasons: vec![Season { num: 1, episodes: vec![
-        Episode { num: 1, title: "When You're Lost in the Darkness".into(), streams: vec![] },
-        Episode { num: 2, title: "Infected".into(), streams: vec![] },
-    ]}] },
-    Series { id: "s3".into(), title: "The Glory".into(), poster: "https://image.tmdb.org/t/p/w500/4f452s5G3nECi4YfI6B0cT7W8j.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/xZJzQjs9sVjU4JxG7JkZ4Q5fR8k.jpg".into(), year: 2023, rating: 8.3, overview: "A woman seeks revenge against her childhood bullies.".into(), genres: vec!["Drama".into(), "Thriller".into()], tags: vec!["Trending".into()], is_kdrama: true, seasons: vec![Season { num: 1, episodes: vec![
-        Episode { num: 1, title: "The Beginning".into(), streams: vec![] },
-        Episode { num: 2, title: "The Reunion".into(), streams: vec![] },
-    ]}] },
-    Series { id: "s4".into(), title: "Crash Landing on You".into(), poster: "https://image.tmdb.org/t/p/w500/6pG64KwF2RBJZP7Q0gNq5F9y3t.jpg".into(), backdrop: "https://image.tmdb.org/t/p/w1280/1S9Hw5GKxJ4LgYcM6f3yX6F5zR.jpg".into(), year: 2019, rating: 8.6, overview: "A South Korean heiress accidentally lands in North Korea.".into(), genres: vec!["Romance".into(), "Drama".into(), "Comedy".into()], tags: vec!["Top Rated".into()], is_kdrama: true, seasons: vec![Season { num: 1, episodes: vec![
-        Episode { num: 1, title: "Episode 1".into(), streams: vec![] },
-        Episode { num: 2, title: "Episode 2".into(), streams: vec![] },
-    ]}] },
-] } }
-
-macro_rules! sample_games { () => { vec![
-    Game { id: "g1".into(), title: "Elden Ring".into(), icon: "https://cdn.akamai.steamstatic.com/steam/apps/1245620/library_600x900.jpg".into(), banner: "".into(), genre: "Action RPG".into(), desc: "The Golden Order has been broken.".into(), size: "48.2 GB".into(), repacker: "FitGirl".into(), url: "".into(), dl_count: 14203, tags: vec!["Top Rated".into()], screenshots: vec![] },
-    Game { id: "g2".into(), title: "Cyberpunk 2077".into(), icon: "https://cdn.akamai.steamstatic.com/steam/apps/1091500/library_600x900.jpg".into(), banner: "".into(), genre: "Open World RPG".into(), desc: "An open-world action-adventure story set in Night City.".into(), size: "69.1 GB".into(), repacker: "DODI".into(), url: "".into(), dl_count: 9876, tags: vec!["Trending".into()], screenshots: vec![] },
-    Game { id: "g3".into(), title: "Baldur's Gate 3".into(), icon: "https://cdn.akamai.steamstatic.com/steam/apps/1086940/library_600x900.jpg".into(), banner: "".into(), genre: "CRPG".into(), desc: "Gather your party and return to the Forgotten Realms.".into(), size: "122 GB".into(), repacker: "FitGirl".into(), url: "".into(), dl_count: 21543, tags: vec!["Top Rated".into(), "New".into()], screenshots: vec![] },
-    Game { id: "g4".into(), title: "Red Dead Redemption 2".into(), icon: "https://cdn.akamai.steamstatic.com/steam/apps/1174180/library_600x900.jpg".into(), banner: "".into(), genre: "Action Adventure".into(), desc: "America, 1899. The end of the Wild West era has begun.".into(), size: "109 GB".into(), repacker: "DODI".into(), url: "".into(), dl_count: 16782, tags: vec![], screenshots: vec![] },
-    Game { id: "g5".into(), title: "Dark Souls III".into(), icon: "https://cdn.akamai.steamstatic.com/steam/apps/374320/library_600x900.jpg".into(), banner: "".into(), genre: "Action RPG".into(), desc: "Embrace the darkness.".into(), size: "24.8 GB".into(), repacker: "FitGirl".into(), url: "".into(), dl_count: 12456, tags: vec!["Top Rated".into()], screenshots: vec![] },
-    Game { id: "g6".into(), title: "Hades".into(), icon: "https://cdn.akamai.steamstatic.com/steam/apps/1145360/library_600x900.jpg".into(), banner: "".into(), genre: "Roguelike".into(), desc: "Defy the god of the dead as you hack and slash out of the Underworld.".into(), size: "8.4 GB".into(), repacker: "Chovkaz".into(), url: "".into(), dl_count: 8921, tags: vec![], screenshots: vec![] },
-] } }
-
-macro_rules! sample_anime { () => { vec![
-    Anime { id: "a1".into(), title: "Attack on Titan".into(), poster: "https://cdn.myanimelist.net/images/anime/10/47347.jpg".into(), banner: "".into(), year: 2013, status: "Completed".into(), eps: 94, rating: 9.1, synopsis: "Giant humanoid Titans threaten humanity's existence.".into(), genres: vec!["Action".into(), "Drama".into(), "Fantasy".into()], tags: vec!["Top Rated".into()], streams: vec![], vmode: VMode::Sub },
-    Anime { id: "a2".into(), title: "Jujutsu Kaisen".into(), poster: "https://cdn.myanimelist.net/images/anime/1171/109222.jpg".into(), banner: "".into(), year: 2020, status: "Airing".into(), eps: 47, rating: 8.8, synopsis: "A boy swallows a cursed talisman and joins a school of sorcerers.".into(), genres: vec!["Action".into(), "Fantasy".into()], tags: vec!["Trending".into()], streams: vec![], vmode: VMode::Sub },
-    Anime { id: "a3".into(), title: "Demon Slayer".into(), poster: "https://cdn.myanimelist.net/images/anime/1286/99889.jpg".into(), banner: "".into(), year: 2019, status: "Completed".into(), eps: 55, rating: 8.7, synopsis: "A boy becomes a demon slayer to avenge his family.".into(), genres: vec!["Action".into(), "Fantasy".into()], tags: vec![], streams: vec![], vmode: VMode::Sub },
-    Anime { id: "a4".into(), title: "Solo Leveling".into(), poster: "https://cdn.myanimelist.net/images/anime/1206/136553.jpg".into(), banner: "".into(), year: 2024, status: "Airing".into(), eps: 12, rating: 8.5, synopsis: "The weakest hunter becomes the strongest.".into(), genres: vec!["Action".into(), "Fantasy".into()], tags: vec!["New".into(), "Trending".into()], streams: vec![], vmode: VMode::Sub },
-    Anime { id: "a5".into(), title: "Fullmetal Alchemist: Brotherhood".into(), poster: "https://cdn.myanimelist.net/images/anime/1223/96541.jpg".into(), banner: "".into(), year: 2009, status: "Completed".into(), eps: 64, rating: 9.2, synopsis: "Two brothers search for the Philosopher's Stone to restore their bodies.".into(), genres: vec!["Action".into(), "Adventure".into(), "Drama".into()], tags: vec!["Top Rated".into()], streams: vec![], vmode: VMode::Sub },
-    Anime { id: "a6".into(), title: "One Punch Man".into(), poster: "https://cdn.myanimelist.net/images/anime/12/76049.jpg".into(), banner: "".into(), year: 2015, status: "Completed".into(), eps: 24, rating: 8.5, synopsis: "A hero who can defeat anyone with a single punch.".into(), genres: vec!["Action".into(), "Comedy".into()], tags: vec![], streams: vec![], vmode: VMode::Sub },
-] } }
-
-macro_rules! sample_hentai { () => { vec![
-    Hentai { id: "h1".into(), title: "Interspecies Reviewers".into(), poster: "https://cdn.myanimelist.net/images/anime/1038/107350.jpg".into(), banner: "".into(), year: 2020, status: "Completed".into(), eps: 12, rating: 7.4, synopsis: "Adventurers review fantasy species at various establishments.".into(), genres: vec!["Comedy".into(), "Fantasy".into(), "Ecchi".into()], tags: vec!["Dubbed".into()], streams: vec![], vmode: VMode::Both, censored: false },
-    Hentai { id: "h2".into(), title: "To Love-Ru".into(), poster: "https://cdn.myanimelist.net/images/anime/7/18114.jpg".into(), banner: "".into(), year: 2008, status: "Completed".into(), eps: 26, rating: 7.2, synopsis: "A boy meets an alien princess who falls in love with him.".into(), genres: vec!["Comedy".into(), "Romance".into(), "Ecchi".into()], tags: vec!["Subbed".into()], streams: vec![], vmode: VMode::Sub, censored: true },
-    Hentai { id: "h3".into(), title: "High School DxD".into(), poster: "https://cdn.myanimelist.net/images/anime/11/75554.jpg".into(), banner: "".into(), year: 2012, status: "Completed".into(), eps: 64, rating: 7.8, synopsis: "A perverted high school student is reincarnated as a devil.".into(), genres: vec!["Action".into(), "Comedy".into(), "Fantasy".into(), "Ecchi".into()], tags: vec!["Dubbed".into(), "Uncensored".into()], streams: vec![], vmode: VMode::Both, censored: false },
-] } }
-
-// --- Catalog commands (sample data for browsing) ---
-
-#[tauri::command]
-pub fn get_movies() -> Vec<Movie> { sample_movies!() }
-
-#[tauri::command]
-pub fn get_series() -> Vec<Series> { sample_series!() }
-
-#[tauri::command]
-pub fn get_kdramas() -> Vec<Series> {
-    sample_series!().into_iter().filter(|s| s.is_kdrama).collect()
+fn to_catalog_item(kind: &str, id: &str, title: &str, poster: &str, year: i32, rating: f32, genres: &[String], tags: &[String]) -> CatalogItem {
+    CatalogItem {
+        id: id.to_string(), title: title.to_string(), poster: poster.to_string(),
+        year, rating, genres: genres.to_vec(), kind: kind.to_string(), tags: tags.to_vec(),
+        genre: None, status: None, eps: None, icon: None, size: None, repacker: None,
+    }
 }
 
 #[tauri::command]
-pub fn get_games() -> Vec<Game> { sample_games!() }
+pub async fn browse_catalog(state: State<'_, AppState>, kind: String, genre: String, sort: String, offset: usize, limit: usize) -> Result<BrowseResult, String> {
+    let cache_key = format!("browse:{}:{}:{}:{}", kind, genre, sort, offset / limit.max(1));
+    {
+        let cache = state.cache.lock().unwrap();
+        if let Some(r) = cache.get(&cache_key) {
+            return Ok(r);
+        }
+    }
+    let page = (offset / limit.max(1)) + 1;
+    match kind.as_str() {
+        "anime" => {
+            match anilist::browse(&state.http, &genre, &sort, page, limit, "ANIME").await {
+                Ok(r) => {
+                    state.cache.lock().unwrap().set(cache_key.clone(), r.clone());
+                    return Ok(r);
+                }
+                Err(e) => { eprintln!("[browse] AniList anime failed: {}", e); return Err(sanitize_error(&e)); }
+            }
+        }
+        "manga" => {
+            match anilist::browse(&state.http, &genre, &sort, page, limit, "MANGA").await {
+                Ok(r) => {
+                    state.cache.lock().unwrap().set(cache_key.clone(), r.clone());
+                    return Ok(r);
+                }
+                Err(e) => { eprintln!("[browse] AniList manga failed: {}", e); return Err(sanitize_error(&e)); }
+            }
+        }
+        "game" => {
+            match steam::browse(&state.http, &sort, page, limit).await {
+                Ok(r) => {
+                    state.cache.lock().unwrap().set(cache_key.clone(), r.clone());
+                    return Ok(r);
+                }
+                Err(e) => { eprintln!("[browse] Steam failed: {}", e); return Err(sanitize_error(&e)); }
+            }
+        }
+        "movie" => {
+            let items = torrents::fetch_movie_catalog(&state.http, &state.db).await;
+            let items: Vec<CatalogItem> = items.into_iter()
+                .filter(|m| genre == "All" || m.genres.contains(&genre))
+                .map(|m| to_catalog_item("movie", &m.id, &m.title, &m.poster, m.year, m.rating, &m.genres, &m.tags))
+                .collect();
+            let mut sorted = items;
+            match sort.as_str() {
+                "rating" => sorted.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal)),
+                "year" => sorted.sort_by(|a, b| b.year.cmp(&a.year)),
+                "title" => sorted.sort_by(|a, b| a.title.cmp(&b.title)),
+                "title-desc" => sorted.sort_by(|a, b| b.title.cmp(&a.title)),
+                _ => {}
+            }
+            let total = sorted.len();
+            let end = std::cmp::min(offset + limit, total);
+            let items = if offset >= total { vec![] } else { sorted[offset..end].to_vec() };
+            let result = BrowseResult { items, total };
+            state.cache.lock().unwrap().set(cache_key, result.clone());
+            return Ok(result);
+        }
+        "series" => {
+            let items = torrents::fetch_series_catalog(&state.http, &state.db).await;
+            let items: Vec<CatalogItem> = items.into_iter()
+                .filter(|s| genre == "All" || s.genres.contains(&genre))
+                .filter(|s| !s.is_kdrama)
+                .map(|s| to_catalog_item("series", &s.id, &s.title, &s.poster, s.year, s.rating, &s.genres, &s.tags))
+                .collect();
+            let mut sorted = items;
+            match sort.as_str() {
+                "rating" => sorted.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal)),
+                "year" => sorted.sort_by(|a, b| b.year.cmp(&a.year)),
+                "title" => sorted.sort_by(|a, b| a.title.cmp(&b.title)),
+                "title-desc" => sorted.sort_by(|a, b| b.title.cmp(&a.title)),
+                _ => {}
+            }
+            let total = sorted.len();
+            let end = std::cmp::min(offset + limit, total);
+            let items = if offset >= total { vec![] } else { sorted[offset..end].to_vec() };
+            let result = BrowseResult { items, total };
+            state.cache.lock().unwrap().set(cache_key, result.clone());
+            return Ok(result);
+        }
+        "kdrama" => {
+            let items = torrents::fetch_series_catalog(&state.http, &state.db).await;
+            let items: Vec<CatalogItem> = items.into_iter()
+                .filter(|s| genre == "All" || s.genres.contains(&genre))
+                .filter(|s| s.is_kdrama)
+                .map(|s| to_catalog_item("series", &s.id, &s.title, &s.poster, s.year, s.rating, &s.genres, &s.tags))
+                .collect();
+            let mut sorted = items;
+            match sort.as_str() {
+                "rating" => sorted.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal)),
+                "year" => sorted.sort_by(|a, b| b.year.cmp(&a.year)),
+                "title" => sorted.sort_by(|a, b| a.title.cmp(&b.title)),
+                "title-desc" => sorted.sort_by(|a, b| b.title.cmp(&a.title)),
+                _ => {}
+            }
+            let total = sorted.len();
+            let end = std::cmp::min(offset + limit, total);
+            let items = if offset >= total { vec![] } else { sorted[offset..end].to_vec() };
+            let result = BrowseResult { items, total };
+            state.cache.lock().unwrap().set(cache_key, result.clone());
+            return Ok(result);
+        }
+        "hentai" => {
+            let items = torrents::fetch_hentai_catalog(&state.http, &state.db).await;
+            let items: Vec<CatalogItem> = items.into_iter()
+                .filter(|h| genre == "All" || h.genres.contains(&genre))
+                .map(|h| CatalogItem {
+                    id: h.id.clone(), title: h.title.clone(), poster: h.poster.clone(),
+                    year: h.year, rating: h.rating, genres: h.genres.clone(),
+                    kind: "hentai".to_string(), tags: h.tags.clone(),
+                    genre: None, status: Some(h.status.clone()), eps: Some(h.eps),
+                    icon: None, size: None, repacker: None,
+                })
+                .collect();
+            let mut sorted = items;
+            match sort.as_str() {
+                "rating" => sorted.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal)),
+                "year" => sorted.sort_by(|a, b| b.year.cmp(&a.year)),
+                "title" => sorted.sort_by(|a, b| a.title.cmp(&b.title)),
+                "title-desc" => sorted.sort_by(|a, b| b.title.cmp(&a.title)),
+                _ => {}
+            }
+            let total = sorted.len();
+            let end = std::cmp::min(offset + limit, total);
+            let items = if offset >= total { vec![] } else { sorted[offset..end].to_vec() };
+            let result = BrowseResult { items, total };
+            state.cache.lock().unwrap().set(cache_key, result.clone());
+            return Ok(result);
+        }
+        _ => return Err(sanitize_error("invalid kind")),
+    }
+}
 
 #[tauri::command]
-pub fn get_anime() -> Vec<Anime> { sample_anime!() }
+pub async fn get_api_detail(state: State<'_, AppState>, kind: String, id: String) -> Result<serde_json::Value, String> {
+    let inner = id.trim_start_matches("tmdb-").trim_start_matches("anilist-").trim_start_matches("steam-");
+    match kind.as_str() {
+        "movie" => {
+            let title = {
+                let items = torrents::fetch_movie_catalog(&state.http, &state.db).await;
+                items.iter().find(|m| m.id == inner)
+                    .map(|m| m.title.clone())
+                    .unwrap_or_default()
+            };
+            if title.is_empty() {
+                return Err(sanitize_error("Movie not found"));
+            }
+            match omdb::fetch_omdb(&title, None).await {
+                Ok(omdb_movie) => {
+                    let json = serde_json::to_value(&omdb_movie).map_err(|e| sanitize_error(&e.to_string()))?;
+                    Ok(json)
+                }
+                Err(e) => Err(sanitize_error(&e)),
+            }
+        }
+        "series" => {
+            let title = {
+                let items = torrents::fetch_series_catalog(&state.http, &state.db).await;
+                items.iter().find(|s| s.id == inner)
+                    .map(|s| s.title.clone())
+                    .unwrap_or_default()
+            };
+            if title.is_empty() {
+                return Err(sanitize_error("Series not found"));
+            }
+            match omdb::fetch_omdb(&title, None).await {
+                Ok(omdb_movie) => {
+                    let json = serde_json::to_value(&omdb_movie).map_err(|e| sanitize_error(&e.to_string()))?;
+                    Ok(json)
+                }
+                Err(e) => Err(sanitize_error(&e)),
+            }
+        }
+        "anime" => anilist::detail(&state.http, inner, "ANIME").await.map_err(|e| sanitize_error(&e)),
+        "manga" => anilist::detail(&state.http, inner, "MANGA").await.map_err(|e| sanitize_error(&e)),
+        "game" => steam::detail(&state.http, inner).await.map_err(|e| sanitize_error(&e)),
+        _ => Err(sanitize_error("unknown kind")),
+    }
+}
 
 #[tauri::command]
-pub fn get_hentai() -> Vec<Hentai> { sample_hentai!() }
+pub async fn browse_anilist(state: State<'_, AppState>, genre: String, sort: String, page: usize, limit: usize, media_type: String) -> Result<BrowseResult, String> {
+    anilist::browse(&state.http, &genre, &sort, page, limit, &media_type).await
+}
 
-// --- Scraper search commands (real torrent results) ---
+#[tauri::command]
+pub async fn search_anilist(state: State<'_, AppState>, query: String, page: usize, limit: usize, media_type: String) -> Result<BrowseResult, String> {
+    anilist::search(&state.http, &query, page, limit, &media_type).await
+}
+
+#[tauri::command]
+pub async fn browse_steam(state: State<'_, AppState>, sort: String, page: usize, limit: usize) -> Result<BrowseResult, String> {
+    steam::browse(&state.http, &sort, page, limit).await
+}
+
+#[tauri::command]
+pub async fn search_steam(state: State<'_, AppState>, query: String, page: usize, limit: usize) -> Result<BrowseResult, String> {
+    steam::search(&state.http, &query, page, limit).await
+}
+
+#[tauri::command]
+pub async fn search_catalog(state: State<'_, AppState>, q: String, kind: String, offset: usize, limit: usize) -> Result<BrowseResult, String> {
+    if q.trim().len() < 1 { return Ok(BrowseResult { items: vec![], total: 0 }); }
+    if kind != "all" {
+        let page = (offset / limit.max(1)) + 1;
+        let api_result = match kind.as_str() {
+            "anime" => anilist::search(&state.http, &q, page, limit, "ANIME").await,
+            "manga" => anilist::search(&state.http, &q, page, limit, "MANGA").await,
+            "game" => steam::search(&state.http, &q, page, limit).await,
+            _ => Err("skip".to_string()),
+        };
+        if let Ok(r) = api_result { return Ok(r); }
+    }
+    let q = q.to_lowercase();
+    let kinds: Vec<&str> = if kind == "all" { vec!["movie","series","anime","hentai","game"] } else { vec![kind.as_str()] };
+    let mut results: Vec<CatalogItem> = Vec::new();
+
+    if kinds.contains(&"movie") {
+        let items = torrents::fetch_movie_catalog(&state.http, &state.db).await;
+        for m in &items {
+            if m.title.to_lowercase().contains(&q) {
+                results.push(to_catalog_item("movie", &m.id, &m.title, &m.poster, m.year, m.rating, &m.genres, &m.tags));
+            }
+        }
+    }
+    if kinds.contains(&"series") {
+        let items = torrents::fetch_series_catalog(&state.http, &state.db).await;
+        for s in &items {
+            if s.title.to_lowercase().contains(&q) {
+                results.push(to_catalog_item("series", &s.id, &s.title, &s.poster, s.year, s.rating, &s.genres, &s.tags));
+            }
+        }
+    }
+    if kinds.contains(&"anime") {
+        let items = torrents::fetch_anime_catalog(&state.http, &state.db).await;
+        for a in &items {
+            if a.title.to_lowercase().contains(&q) {
+                results.push(CatalogItem {
+                    id: a.id.clone(), title: a.title.clone(), poster: a.poster.clone(),
+                    year: a.year, rating: a.rating, genres: a.genres.clone(),
+                    kind: "anime".to_string(), tags: a.tags.clone(),
+                    genre: None, status: Some(a.status.clone()), eps: Some(a.eps),
+                    icon: None, size: None, repacker: None,
+                });
+            }
+        }
+    }
+    if kinds.contains(&"hentai") {
+        let items = torrents::fetch_hentai_catalog(&state.http, &state.db).await;
+        for h in &items {
+            if h.title.to_lowercase().contains(&q) {
+                results.push(CatalogItem {
+                    id: h.id.clone(), title: h.title.clone(), poster: h.poster.clone(),
+                    year: h.year, rating: h.rating, genres: h.genres.clone(),
+                    kind: "hentai".to_string(), tags: h.tags.clone(),
+                    genre: None, status: Some(h.status.clone()), eps: Some(h.eps),
+                    icon: None, size: None, repacker: None,
+                });
+            }
+        }
+    }
+    if kinds.contains(&"game") {
+        let items = torrents::fetch_game_catalog(&state.http, &state.db).await;
+        for g in &items {
+            if g.title.to_lowercase().contains(&q) {
+                results.push(CatalogItem {
+                    id: g.id.clone(), title: g.title.clone(), poster: g.icon.clone(),
+                    year: 0, rating: g.rating, genres: vec![],
+                    kind: "game".to_string(), tags: g.tags.clone(),
+                    genre: Some(g.genre.clone()), status: None, eps: None,
+                    icon: Some(g.icon.clone()), size: Some(g.size.clone()), repacker: Some(g.repacker.clone()),
+                });
+            }
+        }
+    }
+
+    results.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal));
+    let total = results.len();
+    let end = std::cmp::min(offset + limit, total);
+    let items = if offset >= total { vec![] } else { results[offset..end].to_vec() };
+    Ok(BrowseResult { items, total })
+}
+
+#[tauri::command]
+pub async fn get_movies(state: State<'_, AppState>) -> Result<Vec<Movie>, String> {
+    let results = torrents::fetch_movie_catalog(&state.http, &state.db).await;
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn get_series(state: State<'_, AppState>) -> Result<Vec<Series>, String> {
+    let results = torrents::fetch_series_catalog(&state.http, &state.db).await;
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn get_kdramas(state: State<'_, AppState>) -> Result<Vec<Series>, String> {
+    let results = torrents::fetch_series_catalog(&state.http, &state.db).await;
+    Ok(results.into_iter().filter(|s| s.is_kdrama).collect())
+}
+
+#[tauri::command]
+pub async fn get_games(state: State<'_, AppState>) -> Result<Vec<Game>, String> {
+    let results = torrents::fetch_game_catalog(&state.http, &state.db).await;
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn get_anime(state: State<'_, AppState>) -> Result<Vec<Anime>, String> {
+    let results = torrents::fetch_anime_catalog(&state.http, &state.db).await;
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn get_hentai(state: State<'_, AppState>) -> Result<Vec<Hentai>, String> {
+    let results = torrents::fetch_hentai_catalog(&state.http, &state.db).await;
+    Ok(results)
+}
 
 #[tauri::command]
 pub async fn search_movies(q: String, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
     let q = q.trim().to_string();
     if q.len() < 3 { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_movies(client, &q).await)
+    Ok(torrents::search_movies(&state.http, &state.db, &q).await)
 }
 
 #[tauri::command]
 pub async fn search_series(q: String, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
     let q = q.trim().to_string();
     if q.len() < 3 { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_tv(client, &q).await)
+    Ok(torrents::search_tv(&state.http, &state.db, &q).await)
 }
 
 #[tauri::command]
 pub async fn search_anime(q: String, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
     let q = q.trim().to_string();
     if q.len() < 3 { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_anime(client, &q).await)
+    Ok(torrents::search_anime(&state.http, &state.db, &q).await)
 }
 
 #[tauri::command]
 pub async fn search_hentai(q: String, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
     let q = q.trim().to_string();
     if q.len() < 3 { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_hentai(client, &q).await)
+    Ok(torrents::search_hentai(&state.http, &state.db, &q).await)
 }
 
 #[tauri::command]
 pub async fn search_games(q: String, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
     let q = q.trim().to_string();
     if q.len() < 3 { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_games(client, &q).await)
+    Ok(torrents::search_games(&state.http, &state.db, &q).await)
 }
 
 #[tauri::command]
 pub async fn search_all(q: String, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
     let q = q.trim().to_string();
     if q.len() < 2 { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_all(client, &q).await)
+    Ok(torrents::search_all(&state.http, &state.db, &q).await)
 }
-
-// --- Episode streams ---
 
 #[tauri::command]
 pub async fn get_episode_streams(series_id: String, season: i32, episode: i32, state: State<'_, AppState>) -> Result<Vec<StrSrc>, String> {
-    let series = sample_series!();
+    let catalog = torrents::fetch_series_catalog(&state.http, &state.db).await;
     let mut query = String::new();
-    for s in &series {
+    for s in &catalog {
         if s.id == series_id {
             query = format!("{} S{:02}E{:02}", s.title, season, episode);
             break;
         }
     }
     if query.is_empty() { return Ok(vec![]) }
-    let client = &state.http;
-    Ok(torrents::search_tv(client, &query).await)
+    Ok(torrents::search_tv(&state.http, &state.db, &query).await)
 }
-
-// --- Player commands ---
 
 #[tauri::command]
 pub fn play_media(url: String, title: String) -> Result<String, String> {
-    let player = player::detect_player().ok_or("No player found. Install mpv or VLC.".to_string())?;
+    let player = player::detect_player().ok_or_else(|| sanitize_error("No player found. Install mpv or VLC."))?;
     let t = title.clone();
     let p = player.clone();
     tauri::async_runtime::spawn(async move {
@@ -177,10 +427,8 @@ pub fn play_media(url: String, title: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn detect_player() -> Result<String, String> {
-    player::detect_player().ok_or("No player found".to_string())
+    player::detect_player().ok_or_else(|| sanitize_error("No player found"))
 }
-
-// --- Playback commands (DB) ---
 
 #[tauri::command]
 pub async fn get_playback(state: State<'_, AppState>) -> Result<Vec<PlaybackPos>, String> {
@@ -198,8 +446,6 @@ pub async fn save_playback(state: State<'_, AppState>, id: String, title: String
     Ok(())
 }
 
-// --- Favorites (DB) ---
-
 #[tauri::command]
 pub async fn get_favs(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     Ok(db::get_favs(&state.db).await)
@@ -210,14 +456,64 @@ pub async fn toggle_fav(state: State<'_, AppState>, id: String, mtype: String, t
     Ok(db::toggle_fav(&state.db, &id, &mtype, &title, &poster).await)
 }
 
-// --- Downloads ---
-
 #[tauri::command]
 pub fn get_downloads(state: State<AppState>) -> Vec<DlItem> {
     state.dl.list()
 }
 
-// --- Settings ---
+#[tauri::command]
+pub async fn add_download(state: State<'_, AppState>, title: String, url: String, magnet: String, path: String, bytes_total: i64) -> Result<(), String> {
+    let id = format!("dl{}", chrono::Utc::now().timestamp());
+    db::add_download(&state.db, &id, &title, &url, &magnet, &path, bytes_total).await;
+    state.dl.add(DlItem {
+        id: id.clone(), title, progress: 0.0, speed: String::new(),
+        eta: String::new(), status: DlStat::Queued, path, src: url,
+        magnet, bytes_done: 0, bytes_total,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_download(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    db::remove_download(&state.db, &id).await;
+    state.dl.remove(&id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_downloads_db(state: State<'_, AppState>) -> Result<Vec<DlItem>, String> {
+    let rows = db::get_downloads(&state.db).await;
+    Ok(rows.into_iter().map(|r| DlItem {
+        id: r.id, title: r.title, progress: if r.status == "done" { 1.0 } else { 0.0 },
+        speed: String::new(), eta: String::new(),
+        status: match r.status.as_str() {
+            "queued" => DlStat::Queued, "downloading" => DlStat::Downloading,
+            "paused" => DlStat::Paused, "done" => DlStat::Done,
+            "failed" => DlStat::Failed, _ => DlStat::Queued,
+        },
+        path: r.path, src: r.url, magnet: r.magnet,
+        bytes_done: r.bytes_done, bytes_total: r.bytes_total,
+    }).collect())
+}
+
+#[tauri::command]
+pub fn discord_connect(state: State<'_, AppState>, client_id: String) -> Result<(), String> {
+    let mut rpc = state.discord.lock().unwrap();
+    rpc.connect(&client_id)
+}
+
+#[tauri::command]
+pub fn discord_update(state: State<'_, AppState>, state_text: String, details: String) -> Result<(), String> {
+    let mut rpc = state.discord.lock().unwrap();
+    rpc.update(&state_text, &details)
+}
+
+#[tauri::command]
+pub fn discord_disconnect(state: State<'_, AppState>) -> Result<(), String> {
+    let mut rpc = state.discord.lock().unwrap();
+    rpc.disconnect();
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
@@ -227,6 +523,10 @@ pub async fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, Str
         download_path: String::new(),
         scrapers_enabled: vec![],
         accent_color: "#7C5CFF".into(),
+        show_hentai: false,
+        discord_client_id: "1520908611725820085".into(),
+        onboarded: false,
+        theme_mode: "dark".into(),
     };
     for (k, v) in rows {
         match k.as_str() {
@@ -234,6 +534,10 @@ pub async fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, Str
             "download_path" => s.download_path = v,
             "scrapers_enabled" => s.scrapers_enabled = v.split(',').map(|x| x.to_string()).collect(),
             "accent_color" => s.accent_color = v,
+            "show_hentai" => s.show_hentai = v == "true",
+            "discord_client_id" => s.discord_client_id = v,
+            "onboarded" => s.onboarded = v == "true",
+            "theme_mode" => s.theme_mode = v,
             _ => {}
         }
     }
@@ -246,6 +550,10 @@ pub async fn save_settings(state: State<'_, AppState>, settings: AppSettings) ->
     db::save_setting(&state.db, "download_path", &settings.download_path).await;
     db::save_setting(&state.db, "scrapers_enabled", &settings.scrapers_enabled.join(",")).await;
     db::save_setting(&state.db, "accent_color", &settings.accent_color).await;
+    db::save_setting(&state.db, "show_hentai", &settings.show_hentai.to_string()).await;
+    db::save_setting(&state.db, "discord_client_id", &settings.discord_client_id).await;
+    db::save_setting(&state.db, "onboarded", &settings.onboarded.to_string()).await;
+    db::save_setting(&state.db, "theme_mode", &settings.theme_mode).await;
     Ok(())
 }
 
@@ -255,7 +563,48 @@ pub async fn clear_cache(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
-// --- Handler ---
+#[tauri::command]
+pub async fn stream_magnet(magnet: String, state: State<'_, AppState>) -> Result<String, String> {
+    state.streamer.start_stream(&magnet).await.map_err(|e| sanitize_error(&e))
+}
+
+#[tauri::command]
+pub async fn stop_stream(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state.streamer.stop_stream(&id).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn anilist_exchange(state: State<'_, AppState>, code: String) -> Result<String, String> {
+    anilist::exchange_code(&state.http, &code).await.map_err(|e| sanitize_error(&e))
+}
+
+#[tauri::command]
+pub async fn anilist_sync(state: State<'_, AppState>, token: String, media_id: i64, score: i32, status: String, progress: Option<i32>) -> Result<(), String> {
+    anilist::sync_anilist(&state.http, &token, media_id, score, &status, progress).await.map_err(|e| sanitize_error(&e))
+}
+
+#[tauri::command]
+pub async fn search_omdb(_state: State<'_, AppState>, title: String, year: Option<String>) -> Result<serde_json::Value, String> {
+    let movie = omdb::fetch_omdb(&title, year.as_deref()).await.map_err(|e| sanitize_error(&e))?;
+    serde_json::to_value(&movie).map_err(|e| sanitize_error(&e.to_string()))
+}
+
+#[tauri::command]
+pub async fn search_movie_detail(_state: State<'_, AppState>, imdb_id: String) -> Result<serde_json::Value, String> {
+    let movie = omdb::fetch_omdb_by_id(&imdb_id).await.map_err(|e| sanitize_error(&e))?;
+    serde_json::to_value(&movie).map_err(|e| sanitize_error(&e.to_string()))
+}
+
+#[tauri::command]
+pub async fn get_pc_username() -> String {
+    std::env::var("USERNAME").unwrap_or_else(|_| "User".to_string())
+}
+
+#[tauri::command]
+pub async fn proxy_image(url: String) -> Result<String, String> {
+    imgproxy::proxy_image(url).await.map_err(|e| sanitize_error(&e))
+}
 
 pub fn create_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
@@ -265,7 +614,16 @@ pub fn create_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Sen
         play_media, detect_player,
         get_playback, save_playback,
         get_favs, toggle_fav,
-        get_downloads,
+        get_downloads, add_download, remove_download, get_downloads_db,
         get_settings, save_settings, clear_cache,
+        discord_connect, discord_update, discord_disconnect,
+        stream_magnet, stop_stream,
+        browse_catalog, search_catalog,
+        get_api_detail,
+        browse_anilist, search_anilist,
+        browse_steam, search_steam,
+        anilist_exchange, anilist_sync,
+        search_omdb, search_movie_detail,
+        proxy_image, get_pc_username,
     ]
 }

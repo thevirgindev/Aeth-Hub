@@ -1,103 +1,167 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { HeroBanner } from '../components/hero-banner'
-import { MediaRow } from '../components/media-row'
-import { MoviePoster, MoviePosterSkeleton } from '../components/cards/movie-poster'
-import { GameCard, GameCardSkeleton } from '../components/cards/game-card'
+import { ArrowScrollRow } from '../components/arrow-scroll-row'
 import { AnimeCard, AnimeCardSkeleton } from '../components/cards/anime-card'
+import { CachedImage } from '../components/cached-image'
 import { useStore } from '../lib/store'
-import { getMovies, getGames, getAnime, getSeries, getPlayback } from '../lib/api'
-import type { Movie, Game, Anime, Series, PlaybackPos } from '../lib/types'
-import { Play, Clock, ChevronRight } from 'lucide-react'
+import { browseCatalog, getPlayback } from '../lib/api'
+import type { CatalogItem, PlaybackPos } from '../lib/types'
+import { Play, Clock, Shuffle, Sparkles, Swords, Smile, Star } from 'lucide-react'
+
+const SECTION_GENRES = ['Drama', 'Action', 'Comedy'] as const
 
 export function HomePage() {
   const { setPage, setDetailId, setDetailType, showToast } = useStore()
-  const [movies, setMovies] = useState<Movie[]>([])
-  const [games, setGames] = useState<Game[]>([])
-  const [anime, setAnime] = useState<Anime[]>([])
-  const [series, setSeries] = useState<Series[]>([])
+  const [anime, setAnime] = useState<CatalogItem[]>([])
   const [playback, setPlayback] = useState<PlaybackPos[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
-      getMovies(), getGames(), getAnime(), getSeries(), getPlayback()
-    ]).then(([m, g, a, s, p]) => {
-      setMovies(m); setGames(g); setAnime(a); setSeries(s); setPlayback(p)
+      browseCatalog('anime', 'All', 'rating', 0, 40).catch(() => ({ items: [], total: 0 })),
+      getPlayback().catch(() => [] as PlaybackPos[]),
+    ]).then(([a, p]) => {
+      const seen = new Set<string>()
+      setAnime(a.items.filter(item => {
+        if (seen.has(item.id)) return false
+        seen.add(item.id)
+        return true
+      }))
+      setPlayback(p)
     }).finally(() => setLoading(false))
   }, [])
 
-  const heroItems = movies.slice(0, 4).map(m => ({
-    id: m.id, title: m.title, backdrop: m.backdrop, overview: m.overview,
-    year: m.year, rating: m.rating, genres: m.genres,
+  const heroItems = anime
+    .filter(a => a.poster && a.poster.length > 0)
+    .slice(0, 4)
+    .map(a => ({
+      id: a.id, title: a.title, backdrop: a.poster, overview: '',
+      year: a.year, rating: a.rating, genres: a.genres,
+    }))
+
+  const openDetail = useCallback((id: string, type: string) => {
+    setDetailId(id); setDetailType(type); setPage('detail')
+  }, [setDetailId, setDetailType, setPage])
+
+  const surprise = useCallback(() => {
+    const pool = anime.map(a => ({ id: a.id, type: 'anime' }))
+    if (pool.length === 0) return
+    const pick = pool[Math.floor(Math.random() * pool.length)]
+    openDetail(pick.id, pick.type)
+  }, [anime, openDetail])
+
+  const continuePlayback = playback.filter(p => p.mtype === 'anime').slice(0, 6)
+  const continueCards = continuePlayback.map(p => ({
+    ...p,
+    poster: anime.find(i => i.id === p.content_id)?.poster || '',
   }))
 
-  const openDetail = (id: string, type: string) => {
-    setDetailId(id); setDetailType(type); setPage('detail')
+  const genreIcons: Record<string, typeof Swords> = {
+    Drama: Sparkles, Action: Swords, Comedy: Smile,
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 animate-fade">
+    <div className="flex-1 animate-fade overflow-x-hidden">
       <HeroBanner
         items={heroItems}
-        onPlay={(id) => { showToast({ msg: 'Launching player...', type: 'info' }) }}
-        onDetail={(id) => openDetail(id, 'movie')}
+        onPlay={() => { showToast({ msg: 'Launching player...', type: 'info' }) }}
+        onDetail={(id) => openDetail(id, 'anime')}
       />
-      {playback.length > 0 && (
-        <MediaRow title={<span className="flex items-center gap-2"><Clock size={18} /> Continue Watching</span>}>
-          {playback.slice(0, 5).map(p => (
-            <div key={p.content_id}
-              onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setPage('detail') }}
-              className="card-surface w-[200px] p-3 cursor-pointer">
-              <div className="flex items-center gap-3 mb-2">
-                <Play size={14} className="text-accent shrink-0" />
-                <p className="text-sm font-semibold text-text truncate">{p.title}</p>
-              </div>
-              <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-accent rounded-full" style={{ width: `${p.duration_secs > 0 ? (p.position_secs / p.duration_secs * 100) : 0}%` }} />
-              </div>
-              <p className="text-[10px] text-muted mt-1 font-mono">{Math.floor(p.position_secs / 60)}m / {Math.floor(p.duration_secs / 60)}m</p>
+
+      <div className="px-6 -mt-2 relative z-10">
+        <div>
+          <p className="text-sm text-dim/70 mb-4">Discover and stream anime</p>
+        </div>
+
+        {continueCards.length > 0 && (
+          <div className="animate-fade" style={{ animationDelay: '100ms' }}>
+            <section className="mb-7" style={{ contentVisibility: 'auto' }}>
+              <h3 className="text-xl font-extrabold tracking-tight text-text mb-3 flex items-center gap-2">
+                <Clock size={16} /> Continue Watching
+                <span className="h-[2px] flex-1 bg-gradient-to-r from-accent/30 to-transparent ml-2" />
+              </h3>
+              <ArrowScrollRow>
+                {continueCards.map(p => (
+                  <div key={`${p.content_id}-${p.episode ?? ''}`}
+                    onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setPage('detail') }}
+                    className="group/card relative w-[200px] shrink-0 rounded-xl overflow-hidden bg-surface border border-white/[0.06] hover:border-accent/30 transition-all duration-300 cursor-pointer">
+                    {p.poster ? (
+                      <div className="aspect-[2/3] overflow-hidden">
+                        <CachedImage src={p.poster} alt={p.title} title={p.title}
+                          className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-[400ms]" />
+                      </div>
+                    ) : (
+                      <div className="aspect-[2/3] bg-surface/50 flex items-center justify-center">
+                        <Play size={24} className="text-muted/30" />
+                      </div>
+                    )}
+                    <div className="absolute top-2 left-2">
+                      <div className="bg-accent/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Play size={8} fill="white" /> Resume
+                      </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-deep/95 via-deep/80 to-transparent">
+                      <p className="text-xs font-bold text-text truncate">{p.title}</p>
+                      {p.episode != null && (
+                        <p className="text-[10px] text-dim/80">{p.season != null ? `S${p.season} · ` : ''}Ep {p.episode}</p>
+                      )}
+                      <div className="w-full h-0.5 bg-white/10 rounded-full mt-1.5 overflow-hidden">
+                        <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${p.duration_secs > 0 ? (p.position_secs / p.duration_secs * 100) : 0}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </ArrowScrollRow>
+            </section>
+          </div>
+        )}
+
+        {SECTION_GENRES.map((genre, gi) => {
+          const genreItems = anime.filter(a => a.genres.includes(genre)).slice(0, 5)
+          if (genreItems.length === 0) return null
+          const GIcon = genreIcons[genre] || Sparkles
+          return (
+            <div key={genre} className="animate-fade" style={{ animationDelay: `${200 + gi * 100}ms` }}>
+              <section className="mb-7" style={{ contentVisibility: 'auto' }}>
+                <h3 className="text-xl font-extrabold tracking-tight text-text mb-3 flex items-center gap-2">
+                  <GIcon size={16} className="text-accent" /> {genre}
+                  <span className="h-[2px] flex-1 bg-gradient-to-r from-accent/30 to-transparent ml-2" />
+                </h3>
+                <ArrowScrollRow>
+                  {genreItems.map(a => (
+                    <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime')} />
+                  ))}
+                </ArrowScrollRow>
+              </section>
             </div>
-          ))}
-        </MediaRow>
-      )}
-      <MediaRow title={<span className="flex items-center gap-2"><ChevronRight size={18} /> Trending Movies</span>}>
-        {loading
-          ? Array.from({ length: 6 }).map((_, i) => <MoviePosterSkeleton key={i} />)
-          : movies.slice(0, 10).map(m => (
-              <MoviePoster key={m.id} movie={m} onSelect={() => openDetail(m.id, 'movie')} />
-            ))}
-      </MediaRow>
-      {series.length > 0 && (
-        <MediaRow title={<span className="flex items-center gap-2"><ChevronRight size={18} /> Popular Series</span>}>
-          {series.slice(0, 8).map(s => (
-            <div key={s.id} onClick={() => openDetail(s.id, 'series')}
-              className="card-surface w-[160px] cursor-pointer">
-              <div className="poster-base w-full rounded-b-none">
-                <img src={s.poster} alt={s.title} className="w-full h-full object-cover" loading="lazy"
-                  onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"><rect fill="%23111521" width="200" height="300"/><text fill="%23444" font-size="14" x="50%" y="50%" text-anchor="middle" dy=".3em">No Poster</text></svg>' }} />
-              </div>
-              <div className="p-2.5">
-                <p className="text-sm font-semibold text-text truncate">{s.title}</p>
-                <p className="text-[12px] text-muted">{s.year} · {s.seasons?.length || 0} seasons</p>
-              </div>
-            </div>
-          ))}
-        </MediaRow>
-      )}
-      <MediaRow title={<span className="flex items-center gap-2"><ChevronRight size={18} /> Popular Games</span>}>
-        {loading
-          ? Array.from({ length: 6 }).map((_, i) => <GameCardSkeleton key={i} />)
-          : games.slice(0, 8).map(g => (
-              <GameCard key={g.id} game={g} onSelect={() => openDetail(g.id, 'game')} />
-            ))}
-      </MediaRow>
-      <MediaRow title={<span className="flex items-center gap-2"><ChevronRight size={18} /> Top Anime</span>}>
-        {loading
-          ? Array.from({ length: 6 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-          : anime.slice(0, 8).map(a => (
-              <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime')} />
-            ))}
-      </MediaRow>
+          )
+        })}
+
+        <div className="animate-fade" style={{ animationDelay: '400ms' }}>
+          <section className="mb-7" style={{ contentVisibility: 'auto' }}>
+            <h3 className="text-xl font-extrabold tracking-tight text-text mb-3 flex items-center gap-2">
+              <Star size={16} className="text-accent" /> Top Anime
+              <span className="h-[2px] flex-1 bg-gradient-to-r from-accent/30 to-transparent ml-2" />
+            </h3>
+            <ArrowScrollRow>
+              {loading
+                ? Array.from({ length: 5 }).map((_, i) => <AnimeCardSkeleton key={i} />)
+                : anime.slice(0, 5).map(a => (
+                    <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime')} />
+                  ))}
+            </ArrowScrollRow>
+          </section>
+        </div>
+
+        <div className="flex justify-center my-6">
+          <button onClick={surprise}
+            className="glass glass-hover rounded-xl px-5 py-2.5 text-sm text-dim flex items-center gap-2 cursor-pointer transition-all hover:text-text">
+            <Shuffle size={14} /> Surprise Me
+          </button>
+        </div>
+
+        <div className="h-8" />
+      </div>
     </div>
   )
 }
