@@ -70,11 +70,23 @@ input, textarea, [contenteditable], code, kbd, pre { user-select: auto; -webkit-
 .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08); }
 .glass-hover:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
 .glass-modal { background: rgba(0,0,0,0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-.glass-sidebar { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-[data-theme="light"] .glass { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
-[data-theme="light"] .glass-hover:hover { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.15); }
-[data-theme="light"] .glass-modal { background: rgba(255,255,255,0.85); }
-[data-theme="light"] .glass-sidebar { background: rgba(0,0,0,0.02); }
+.glass-sidebar {
+  position: relative;
+  overflow: hidden;
+}
+.glass-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 0;
+  pointer-events: none;
+}
+.glass-sidebar > * { position: relative; z-index: 1; }
+[data-theme="light"] .glass-sidebar { background: transparent; }
+[data-theme="light"] .glass-sidebar::before { background: rgba(0,0,0,0.02); }
 .glass-sidebar::after {
   content: '';
   position: absolute;
