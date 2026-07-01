@@ -19,7 +19,7 @@ export function HomePage() {
 
   useEffect(() => {
     Promise.all([
-      browseCatalog('anime', 'All', 'rating', 0, 40).catch(() => ({ items: [], total: 0 })),
+      browseCatalog('anime', 'All', 'rating', 0, 200).catch(() => ({ items: [], total: 0 })),
       getPlayback().catch(() => [] as PlaybackPos[]),
     ]).then(([a, p]) => {
       const seen = new Set<string>()
@@ -75,7 +75,7 @@ export function HomePage() {
         onDetail={(id) => openDetail(id, 'anime')}
       />
 
-      <div className="px-6 -mt-2 relative z-10">
+      <div className="pl-4 pr-6 -mt-2 relative z-10">
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-dim/70">Discover and stream anime</p>
           <button onClick={surprise}
@@ -98,7 +98,7 @@ export function HomePage() {
                 {continueCards.map(p => (
                   <div key={`${p.content_id}-${p.episode ?? ''}`}
                     onClick={() => { setDetailId(p.content_id); setDetailType(p.mtype); setDetailPoster(p.poster); setPage('detail') }}
-                    className="group/card relative w-[200px] shrink-0 rounded-xl overflow-hidden bg-surface border border-white/[0.06] hover:border-accent/30 transition-all duration-300 cursor-pointer">
+                    className="group/card relative shrink-0 rounded-xl overflow-hidden bg-surface border border-white/[0.06] hover:border-accent/30 transition-all duration-300 cursor-pointer">
                     {p.poster ? (
                       <div className="aspect-[2/3] overflow-hidden">
                         <CachedImage src={p.poster} alt={p.title} title={p.title}
@@ -131,7 +131,7 @@ export function HomePage() {
         )}
 
         {SECTION_GENRES.map((genre, gi) => {
-          const genreItems = anime.filter(a => a.genres.includes(genre)).slice(0, 15)
+          const genreItems = anime.filter(a => a.genres.includes(genre))
           if (genreItems.length === 0) return null
           const GIcon = genreIcons[genre] || Sparkles
           return (
@@ -160,7 +160,7 @@ export function HomePage() {
             <ArrowScrollRow carousel>
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-                : anime.slice(0, 20).map(a => (
+                : anime.map(a => (
                     <AnimeCard key={a.id} anime={a} onSelect={() => openDetail(a.id, 'anime', a.poster)} />
                   ))}
             </ArrowScrollRow>
