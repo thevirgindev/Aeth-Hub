@@ -34,7 +34,7 @@ export function Titlebar() {
   const pageTitle = titles[page] || 'Home'
   const displayTitle = page === 'home'
     ? (user ? `Welcome back, ${user.username}!` : pcUser ? `Welcome back, ${pcUser}!` : 'Welcome back!')
-    : `Aeth Hub | ${pageTitle}`
+    : `Aeth Hub  ·  ${pageTitle}`
 
   return (
     <div className="h-[38px] flex items-center bg-deep select-none shrink-0 border-b border-border relative">
@@ -66,6 +66,8 @@ export function Titlebar() {
           <X size={14} />
         </button>
       </div>
+      <div className="absolute inset-0 pointer-events-none opacity-[0.04] animate-gradient -z-10"
+        style={{ background: 'linear-gradient(90deg, #7C5CFF, #A78BFA, #7C5CFF, #A78BFA)', backgroundSize: '200% 100%' }} />
       <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
         style={{
           background: `linear-gradient(to right, #7C5CFF50 0%, #7C5CFF25 120px, transparent 60%)`,
